@@ -43,7 +43,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Type-check iOS companion
         run: |
-          xcrun swiftc -typecheck \
-            ios/TelemetryService.swift \
-            ios/LocationCollector.swift \
-            ios/CalendarCollector.swift
+          xcrun swiftc -typecheck ios/*.swift

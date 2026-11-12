@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">GHOSTTRACE Companion</string>
+    <string name="consent_title">Consent &amp; setup</string>
+    <string name="consent_body">GHOSTTRACE Companion collects device telemetry (battery, network, OS version), optional location, and app usage statistics, and sends them to your GHOSTTRACE backend. Tracking is visible via a persistent notification. No passwords or session cookies are collected. Grant only if you authorize this device.</string>
+    <string name="tracking_active">GHOSTTRACE tracking active</string>
+</resources>

@@ -25,8 +25,10 @@ from datetime import datetime, timezone
 
 try:
     from pymobiledevice3.lockdown import create_using_usbmux
+    _HAS_PMD3 = True
 except ImportError:
-    sys.exit("pymobiledevice3 not installed. Run: pip install pymobiledevice3")
+    create_using_usbmux = None  # type: ignore[assignment]
+    _HAS_PMD3 = False
 
 
 def collect(lockdown) -> dict:
@@ -65,11 +67,46 @@ def push(backend: str, device_key: str, payload: dict) -> int:
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--backend", default="http://localhost:8000")
-    ap.add_argument("--device-key", required=True)
+    ap.add_argument("--device-key", required=False, default="gt_dryrun")
     ap.add_argument("--interval", type=int, default=0, help="seconds between pushes; 0 = once")
     ap.add_argument("--once", action="store_true")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="Print the payload that would be pushed without connecting to a device or backend")
     args = ap.parse_args()
 
+    if args.dry_run:
+        info = {
+            "device_name": "Dry Run Device",
+            "model": "iPhone",
+            "ios_version": "17.0",
+            "build": "dry-run",
+            "udid": "00000000-0000-0000-0000-000000000000",
+            "capacity_gb": 128.0,
+            "battery_level": 80,
+        }
+        now = datetime.now(timezone.utc).isoformat()
+        events = [{
+            "application": "iOS Device",
+            "event_type": "device.inspection",
+            "category": "device",
+            "timestamp": now,
+            "description": f"{info['device_name']} on iOS {info['ios_version']}",
+            "metadata": info,
+            "dedup_key": f"ios-inspect:{now}",
+        }]
+        payload = {
+            "os_version": info.get("ios_version"),
+            "app_version": "ios_inspector/1.0",
+            "battery_level": info.get("battery_level"),
+            "events": events,
+        }
+        print(json.dumps(payload, indent=2))
+        return
+
+    if not args.device_key:
+        ap.error("--device-key is required unless --dry-run")
+    if not _HAS_PMD3:
+        sys.exit("pymobiledevice3 not installed. Run: pip install pymobiledevice3")
     lockdown = create_using_usbmux()
     print(f"Connected: {lockdown.display_name} ({lockdown.product_type})")
 

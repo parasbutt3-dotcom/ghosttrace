@@ -3,30 +3,52 @@
 Swift companion that registers a device and pushes telemetry to the GHOSTTRACE backend.
 
 ## Files
-- `TelemetryService.swift` — HTTP push + battery/network/OS collection.
+- `project.yml` — XcodeGen spec. Generate the Xcode project with `xcodegen generate`.
+- `Info.plist` — bundle + permission + background-mode configuration.
+- `TelemetryService.swift` — HTTP push + battery (UIDevice) + network (NWPathMonitor) + OS/app version collection.
 - `LocationCollector.swift` — significant location changes → `location.point` events.
 - `CalendarCollector.swift` — phone calendars (all accounts) → `calendar.event` events.
+- `SettingsView.swift` — SwiftUI settings for base URL + device key.
+- `GhostTraceApp.swift` — app entry point, background refresh scheduling, collector wiring.
 
-## Wiring (AppDelegate)
+## Build (XcodeGen)
+```sh
+brew install xcodegen   # or: mint install yonaskolb/XcodeGen
+cd ios
+xcodegen generate
+open GhostTrace.xcodeproj
+```
+No checked-in `.xcodeproj`; `project.yml` is the source of truth.
+
+## Wiring (AppDelegate / SwiftUI)
+The app entry point in `GhostTraceApp.swift` already wires collectors:
 ```swift
-let telemetry = TelemetryService(baseUrl: "http://YOUR_HOST:8000", deviceKey: "gt_XXXX")
+let telemetry = TelemetryService()   // reads base URL + device key from Settings
 telemetry.observeBattery()
 let location = LocationCollector(telemetry: telemetry)
 let calendar = CalendarCollector(telemetry: telemetry)
-
-func application(_ application: UIApplication, didFinishLaunchingWithOptions: ...) -> Bool {
-    location.start()
-    calendar.start { _ in calendar.syncNow() }
-    Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { _ in calendar.syncNow() }
-    return true
-}
+location.start()
+// calendar permission + sync on iOS 17+
 ```
-Register the device first: dashboard → Devices → Register iOS Device, copy the one-time key.
+Register the device first: dashboard → Devices → Register iOS Device, copy the one-time key, then paste it in Settings.
+
+## Settings
+`SettingsView` stores:
+- `ghosttrace.baseURL` (default `http://127.0.0.1:8000`)
+- `ghosttrace.deviceKey` (the `gt_...` key from device registration)
+
+`TelemetryService` reads both on every push, so changes take effect without restart.
 
 ## Info.plist keys
 - `NSLocationWhenInUseUsageDescription` — "See where your day happened on your timeline."
 - `NSLocationAlwaysAndWhenInUseUsageDescription` — for continuous tracking (also enable Background Modes → Location).
 - `NSCalendarsFullAccessUsageDescription` — "Import your meetings into your activity timeline."
+- `NSCalendarsUsageDescription` — fallback for pre-iOS 17.
+- `UIBackgroundModes` — `fetch`, `processing`, `location`.
+- `BGTaskSchedulerPermittedIdentifiers` — `com.ghosttrace.companion.refresh`.
+
+## Background modes
+Background refresh is scheduled via `BGTaskScheduler` (identifier `com.ghosttrace.companion.refresh`) for periodic telemetry pushes. Location background mode supports continuous tracking when the user grants "Always" authorization.
 
 ## API contract
 `POST /api/v1/devices/telemetry` with `X-Device-Key` header; body validated by `TelemetryIn`
@@ -34,6 +56,8 @@ Register the device first: dashboard → Devices → Register iOS Device, copy t
 
 ## Notes
 - No stealth tracking; app must be visibly installed and authorized.
-- Screen Time / app-usage data requires Apple's Family Controls entitlement — not enabled here.
+- Screen Time / app-usage data requires Apple's Family Controls entitlement — **not enabled here**; capability stays `false` (see backend `ios` integration).
+- Motion activity (CoreMotion) is not collected; capability stays `false`.
 - HealthKit data is never auto-collected; each type requires explicit permission.
-- These files are ready-to-drop-in sources; compile in Xcode (not built in this repo's CI).
+- USB fallback (no app install): `tools/ios_inspector.py` (pymobiledevice3). Use `--dry-run` to print the payload without connecting.
+- These files are ready-to-build sources; compile in Xcode (not built in this repo's CI beyond `swiftc -typecheck`).
