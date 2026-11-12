@@ -1,10 +1,12 @@
-import httpx
 from datetime import datetime, timezone
+from typing import Any
 
+import httpx
+
+from app.config import settings
+from app.core.security import decrypt_secret
 from app.integrations.base import BaseIntegration, Capability
 from app.integrations.registry import register
-from app.core.security import decrypt_secret
-from app.config import settings
 
 
 @register("wazuh")
@@ -45,7 +47,7 @@ class WazuhIntegration(BaseIntegration):
 
     async def sync(self):
         base, token = await self._auth_token()
-        summary = {"ok": False, "events_created": 0}
+        summary: dict[str, Any] = {"ok": False, "events_created": 0}
         if not token:
             summary["error"] = "authentication failed"
             if self.integration:
@@ -70,7 +72,8 @@ class WazuhIntegration(BaseIntegration):
                         )
                         summary["events_created"] += 1
             except Exception as e:
-                summary.setdefault("errors", []).append(str(e))
+                summary.setdefault("errors", [])
+                summary["errors"].append(str(e))
             # alerts
             try:
                 r = await client.get(f"{base}/alerts", headers=headers, params={"limit": 100, "sort": "-timestamp"})
@@ -90,7 +93,8 @@ class WazuhIntegration(BaseIntegration):
                         )
                         summary["events_created"] += 1
             except Exception as e:
-                summary.setdefault("errors", []).append(str(e))
+                summary.setdefault("errors", [])
+                summary["errors"].append(str(e))
 
         summary["ok"] = True
         if self.integration:

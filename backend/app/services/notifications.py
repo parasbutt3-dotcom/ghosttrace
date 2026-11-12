@@ -103,9 +103,10 @@ def deliver_alert(db: Session, user: User, alert: dict, *, force: bool = False) 
             delivered = True
         except Exception:
             pass
-    if getattr(user, "webhook_url", None):
+    webhook_url = getattr(user, "webhook_url", None)
+    if webhook_url:
         try:
-            send_alert_webhook(user.webhook_url, payload)
+            send_alert_webhook(webhook_url, payload)
             delivered = True
         except Exception:
             pass

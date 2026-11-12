@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 from typing import Any
+
+from pydantic import BaseModel
 
 
 class EventIn(BaseModel):
@@ -21,6 +22,7 @@ class EventIn(BaseModel):
 
 
 from typing import Any as _Any
+
 
 class EventOut(BaseModel):
     id: str

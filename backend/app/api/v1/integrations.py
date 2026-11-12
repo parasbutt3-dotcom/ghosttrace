@@ -1,15 +1,18 @@
-import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.database import get_db
-from app.models.user import User
-from app.models.integration import Integration
-from app.models.account import ConnectedAccount
-from app.schemas.account import IntegrationOut, AccountOut
-from app.services.integrations import build_integration, list_integrations, get_integration
 from app.integrations.registry import available_kinds
+from app.models.account import ConnectedAccount
+from app.models.integration import Integration
+from app.models.user import User
+from app.schemas.account import AccountOut, IntegrationOut
+from app.services.integrations import (
+    build_integration,
+    get_integration,
+    list_integrations,
+)
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 

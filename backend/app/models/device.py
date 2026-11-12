@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, DateTime, Boolean, ForeignKey, Text, JSON, Float
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -28,6 +28,6 @@ class Device(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    user: Mapped["User"] = relationship(back_populates="devices")
-    integration: Mapped["Integration | None"] = relationship(back_populates="devices")
-    events: Mapped[list["Event"]] = relationship(back_populates="device", cascade="all, delete-orphan")
+    user: Mapped["User"] = relationship(back_populates="devices")  # type: ignore[name-defined]
+    integration: Mapped["Integration | None"] = relationship(back_populates="devices")  # type: ignore[name-defined]
+    events: Mapped[list["Event"]] = relationship(back_populates="device", cascade="all, delete-orphan")  # type: ignore[name-defined]

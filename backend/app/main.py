@@ -1,8 +1,8 @@
-import asyncio
 from contextlib import asynccontextmanager
 
 # Optional Sentry/GlitchTip init (no-op when SENTRY_DSN is unset).
 from app.config import settings
+
 if getattr(settings, "SENTRY_DSN", ""):
     try:
         import sentry_sdk
@@ -10,21 +10,33 @@ if getattr(settings, "SENTRY_DSN", ""):
     except Exception:
         pass
 
-from fastapi import FastAPI, Depends, Response
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import Base, engine, get_db
+import app.integrations.activitywatch
+import app.integrations.android
+import app.integrations.github
+import app.integrations.google
+import app.integrations.ios
+import app.integrations.wazuh
 from app.api.deps import get_current_user
-from app.models import *  # noqa
-import app.integrations.google  # noqa
-import app.integrations.activitywatch  # noqa
-import app.integrations.wazuh  # noqa
-import app.integrations.android  # noqa
-import app.integrations.ios  # noqa
-import app.integrations.github  # noqa
-from app.models.user import User
-from app.api.v1 import auth, integrations, events, devices, reports, security, admin, apikeys, rules, insights, takeout
+from app.api.v1 import (
+    admin,
+    apikeys,
+    auth,
+    devices,
+    events,
+    insights,
+    integrations,
+    reports,
+    rules,
+    security,
+    takeout,
+)
+from app.database import Base, engine, get_db
 from app.metrics import HTTP_REQUESTS_TOTAL, metrics_text
+from app.models import *
+from app.models.user import User
 
 if settings.APP_ENV == "development":
     Base.metadata.create_all(bind=engine)
@@ -41,14 +53,16 @@ async def lifespan(app: FastAPI):
         from app.services.scheduler import stop_scheduler
         stop_scheduler(scheduler)
 
-app = FastAPI(title=settings.APP_NAME, version="0.1.0", debug=settings.DEBUG, lifespan=lifespan)
+app: FastAPI = FastAPI(title=settings.APP_NAME, version="0.1.0", debug=settings.DEBUG, lifespan=lifespan)  # type: ignore[no-redef]
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.api.v1.auth import limiter
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-app.add_middleware(
+from app.api.v1.auth import limiter
+
+app.state.limiter = limiter  # type: ignore[attr-defined]
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[attr-defined]
+
+app.add_middleware(  # type: ignore[attr-defined]
     CORSMiddleware,
     allow_origins=settings.cors_list(),
     allow_credentials=True,
@@ -57,7 +71,7 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
+@app.middleware("http")  # type: ignore[attr-defined]
 async def security_headers(request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -69,7 +83,7 @@ async def security_headers(request, call_next):
     return response
 
 
-@app.middleware("http")
+@app.middleware("http")  # type: ignore[attr-defined]
 async def metrics_http_middleware(request, call_next):
     response = await call_next(request)
     try:
@@ -83,12 +97,12 @@ async def metrics_http_middleware(request, call_next):
     return response
 
 
-@app.get("/health")
+@app.get("/health")  # type: ignore[attr-defined]
 def health():
     return {"status": "ok", "app": settings.APP_NAME}
 
 
-@app.get("/ready")
+@app.get("/ready")  # type: ignore[attr-defined]
 def ready(db=Depends(get_db)):
     try:
         db.execute(__import__("sqlalchemy").text("SELECT 1"))
@@ -98,19 +112,19 @@ def ready(db=Depends(get_db)):
         raise HTTPException(status_code=503, detail=str(e))
 
 
-@app.get("/metrics")
+@app.get("/metrics")  # type: ignore[attr-defined]
 def metrics():
     from app.metrics import refresh_scheduler_age
     refresh_scheduler_age()
     return Response(content=metrics_text(), media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
-@app.get("/api/v1/overview")
+@app.get("/api/v1/overview")  # type: ignore[attr-defined]
 def overview(user: User = Depends(get_current_user), db=Depends(get_db)):
+    from app.models.account import ConnectedAccount
+    from app.models.device import Device
     from app.models.event import Event
     from app.models.integration import Integration
-    from app.models.device import Device
-    from app.models.account import ConnectedAccount
     uid = user.id
     return {
         "accounts": db.query(ConnectedAccount).filter(ConnectedAccount.user_id == uid).count(),
@@ -126,14 +140,14 @@ def overview(user: User = Depends(get_current_user), db=Depends(get_db)):
     }
 
 
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(integrations.router, prefix="/api/v1")
-app.include_router(events.router, prefix="/api/v1")
-app.include_router(devices.router, prefix="/api/v1")
-app.include_router(reports.router, prefix="/api/v1")
-app.include_router(security.router, prefix="/api/v1")
-app.include_router(admin.router, prefix="/api/v1")
-app.include_router(apikeys.router, prefix="/api/v1")
-app.include_router(rules.router, prefix="/api/v1")
-app.include_router(insights.router, prefix="/api/v1")
-app.include_router(takeout.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")  # type: ignore[attr-defined]
+app.include_router(integrations.router, prefix="/api/v1")  # type: ignore[attr-defined]
+app.include_router(events.router, prefix="/api/v1")  # type: ignore[attr-defined]
+app.include_router(devices.router, prefix="/api/v1")  # type: ignore[attr-defined]
+app.include_router(reports.router, prefix="/api/v1")  # type: ignore[attr-defined]
+app.include_router(security.router, prefix="/api/v1")  # type: ignore[attr-defined]
+app.include_router(admin.router, prefix="/api/v1")  # type: ignore[attr-defined]
+app.include_router(apikeys.router, prefix="/api/v1")  # type: ignore[attr-defined]
+app.include_router(rules.router, prefix="/api/v1")  # type: ignore[attr-defined]
+app.include_router(insights.router, prefix="/api/v1")  # type: ignore[attr-defined]
+app.include_router(takeout.router, prefix="/api/v1")  # type: ignore[attr-defined]

@@ -5,10 +5,10 @@ from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin
+from app.config import settings
 from app.database import get_db
 from app.models.event import Event
 from app.models.user import User
-from app.config import settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -20,5 +20,6 @@ def run_retention(user: User = Depends(get_current_admin), db: Session = Depends
     cutoff = datetime.now(timezone.utc) - timedelta(days=settings.EVENT_RETENTION_DAYS)
     res = db.execute(delete(Event).where(Event.user_id == user.id, Event.timestamp < cutoff))
     db.commit()
-    log_action(db, user.id, "retention.run", details={"deleted": res.rowcount, "cutoff": cutoff.isoformat()})
-    return {"deleted": res.rowcount, "cutoff": cutoff.isoformat()}
+    deleted = int(getattr(res, "rowcount", 0) or 0)
+    log_action(db, user.id, "retention.run", details={"deleted": deleted, "cutoff": cutoff.isoformat()})
+    return {"deleted": deleted, "cutoff": cutoff.isoformat()}

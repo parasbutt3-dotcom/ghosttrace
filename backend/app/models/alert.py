@@ -1,4 +1,4 @@
-from app.models.alert_ack import AlertAck, AlertAcknowledgement, AlertAcknowledgment, AcknowledgedAlert
+from app.models.alert_ack import AlertAck
 
 # Common alternate class names.
 AlertAckModel = AlertAck

@@ -32,8 +32,8 @@ def create_key(req: ApiKeyCreate, user: User = Depends(get_current_user), db: Se
 def list_keys(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.query(ApiKey).filter(ApiKey.user_id == user.id).order_by(ApiKey.created_at.desc()).all()
     return [{"id": a.id, "name": a.name, "prefix": a.prefix,
-             "created_at": ensure_utc(a.created_at).isoformat() if a.created_at else None,
-             "last_used_at": ensure_utc(a.last_used_at).isoformat() if a.last_used_at else None} for a in rows]
+             "created_at": (x.isoformat() if (x := ensure_utc(a.created_at)) else None),
+             "last_used_at": (x.isoformat() if (x := ensure_utc(a.last_used_at)) else None)} for a in rows]
 
 
 @router.delete("/{key_id}")

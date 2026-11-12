@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from app.models.event import Event
@@ -6,7 +8,7 @@ from app.models.event import Event
 try:
     from app.metrics import EVENTS_INGESTED_TOTAL
 except Exception:  # pragma: no cover
-    EVENTS_INGESTED_TOTAL = None
+    EVENTS_INGESTED_TOTAL: Any = None  # type: ignore[no-redef]
 
 
 def _parse_ts(ts):

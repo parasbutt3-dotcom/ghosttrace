@@ -37,6 +37,10 @@ jobs:
       - working-directory: backend
         run: python -m pytest -q
       - working-directory: backend
+        run: python -m ruff check app
+      - working-directory: backend
+        run: python -m mypy app --ignore-missing-imports
+      - working-directory: backend
         run: python -c "import app.main; print('import ok')"
 
   frontend:
@@ -51,7 +55,30 @@ jobs:
       - working-directory: frontend
         run: npm run lint
       - working-directory: frontend
+        run: npm test
+      - working-directory: frontend
         run: npm run build
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+      - name: Assemble debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+  docker-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate docker compose config
+        run: docker compose config
 
   ios-typecheck:
     # Compiles the companion sources on real Apple hardware.
@@ -64,3 +91,31 @@ jobs:
       - name: Type-check iOS companion
         run: |
           xcrun swiftc -typecheck ios/*.swift
+
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:///./e2e_ghosttrace.db
+      SECRET_KEY: e2e-secret-key-32chars-minimum-aaaa
+      AUTO_SYNC_ENABLED: "false"
+      APP_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps
+      - name: Run E2E smoke
+        working-directory: frontend
+        run: npm run test:e2e

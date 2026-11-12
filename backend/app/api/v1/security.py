@@ -1,17 +1,17 @@
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
-from fastapi import APIRouter, Depends, Body, Query
+from fastapi import APIRouter, Body, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.config import settings
 from app.database import get_db
-from app.models.user import User
+from app.models.alert_ack import AlertAck
 from app.models.event import Event
 from app.models.integration import Integration
-from app.models.alert_ack import AlertAck
+from app.models.user import User
 
 router = APIRouter(prefix="/security", tags=["security"])
 
@@ -25,7 +25,7 @@ def retention(user: User = Depends(get_current_user)):
 
 
 def _fingerprints_dismissed(db: Session, user_id: str) -> set[str]:
-    return {a.fingerprint for a in db.query(AlertAck).filter(AlertAck.user_id == user_id, AlertAck.dismissed == True).all()}  # noqa: E712
+    return {a.fingerprint for a in db.query(AlertAck).filter(AlertAck.user_id == user_id, AlertAck.dismissed == True).all()}
 
 
 def _get_ack(db: Session, user_id: str, fingerprint: str) -> AlertAck:
@@ -53,7 +53,7 @@ def alerts(
 ):
     since = datetime.now(timezone.utc) - timedelta(days=7)
     events = db.query(Event).filter(Event.user_id == user.id, Event.timestamp >= since).all()
-    alerts_out = []
+    alerts_out: list[dict[str, Any]] = []
     # 1. integration failures
     for integ in db.query(Integration).filter(Integration.user_id == user.id).all():
         if integ.status == "error" or integ.last_error:
@@ -65,7 +65,7 @@ def alerts(
                 "fingerprint": f"integration_failure:{integ.id}",
             })
     # 2. unusual event frequency: source with > 3x average daily count
-    counts = {}
+    counts: dict[str, int] = {}
     for e in events:
         counts.setdefault(e.source, 0)
         counts[e.source] += 1

@@ -46,7 +46,7 @@ def rule_alerts(db: Session, user_id: str) -> list[dict]:
     """Evaluate enabled detection rules against recent events; return alert dicts."""
     now = datetime.now(timezone.utc)
     alerts = []
-    for rule in db.query(DetectionRule).filter(DetectionRule.user_id == user_id, DetectionRule.enabled == True).all():  # noqa: E712
+    for rule in db.query(DetectionRule).filter(DetectionRule.user_id == user_id, DetectionRule.enabled == True).all():
         q = db.query(func.count(Event.id)).filter(Event.user_id == user_id)
         if rule.event_type:
             q = q.filter(Event.event_type == rule.event_type)
@@ -76,7 +76,7 @@ def list_rules(user: User = Depends(get_current_user), db: Session = Depends(get
              "source": r.source, "category": r.category, "application": r.application,
              "window_hours": r.window_hours, "min_count": r.min_count, "severity": r.severity,
              "enabled": r.enabled,
-             "created_at": ensure_utc(r.created_at).isoformat() if r.created_at else None} for r in rows]
+             "created_at": (x.isoformat() if (x := ensure_utc(r.created_at)) else None)} for r in rows]
 
 
 @router.post("")

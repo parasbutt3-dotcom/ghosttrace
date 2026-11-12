@@ -1,13 +1,13 @@
 import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import httpx
-from datetime import datetime, timedelta, timezone
 
 from app.config import settings
+from app.core.security import decrypt_secret, encrypt_secret, ensure_utc
 from app.integrations.base import BaseIntegration, Capability
 from app.integrations.registry import register
-from app.core.security import decrypt_secret, ensure_utc, encrypt_secret
-from app.models.event import Event
 
 logger = logging.getLogger("ghosttrace.integrations.google")
 
@@ -132,7 +132,7 @@ class GoogleIntegration(BaseIntegration):
         token = self._token()
         if not token:
             return {"ok": False, "error": "no token"}
-        summary = {"ok": True, "events_created": 0, "capabilities": [c.to_dict() for c in self.capabilities()]}
+        summary: dict[str, Any] = {"ok": True, "events_created": 0, "capabilities": [c.to_dict() for c in self.capabilities()]}
         async with httpx.AsyncClient(timeout=30) as client:
             # 1. userinfo
             try:

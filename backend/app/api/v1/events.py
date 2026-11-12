@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_current_user_or_api_key
+from app.api.v1.auth import limiter
 from app.database import get_db
 from app.models.user import User
-from app.schemas.event import EventOut, EventIn
-from app.services.events import query_events, ingest_event
-from app.api.v1.auth import limiter
+from app.schemas.event import EventIn, EventOut
+from app.services.events import ingest_event, query_events
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -27,8 +27,8 @@ def list_events(
     user: User = Depends(get_current_user_or_api_key),
     db: Session = Depends(get_db),
 ):
-    filters = dict(source=source, application=application, event_type=event_type, category=category,
-                   device_id=device_id, account_id=account_id, start=start, end=end, q=q)
+    filters = {"source": source, "application": application, "event_type": event_type, "category": category,
+                   "device_id": device_id, "account_id": account_id, "start": start, "end": end, "q": q}
     items, total = query_events(db, user.id, filters, limit=limit, offset=offset)
     out = []
     for e in items:
@@ -45,7 +45,6 @@ def list_events(
 @router.post("")
 @limiter.limit("120/minute")
 def create_event(request: Request, payload: EventIn, user: User = Depends(get_current_user_or_api_key), db: Session = Depends(get_db)):
-    from datetime import datetime
     ts = payload.timestamp
     ev = ingest_event(
         db, user.id, source=payload.source, event_type=payload.event_type, timestamp=ts,
@@ -55,12 +54,13 @@ def create_event(request: Request, payload: EventIn, user: User = Depends(get_cu
         permission_status=payload.permission_status, confidence=payload.confidence,
         dedup_key=payload.dedup_key, raw=payload.raw,
     )
-    return {"id": ev.id}
+    return {"id": ev.id if ev is not None else None}
 
 
 @router.get("/stats")
 def stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     from sqlalchemy import func
+
     from app.models.event import Event
     total = db.query(func.count(Event.id)).filter(Event.user_id == user.id).scalar()
     by_source = db.query(Event.source, func.count(Event.id)).filter(Event.user_id == user.id).group_by(Event.source).all()

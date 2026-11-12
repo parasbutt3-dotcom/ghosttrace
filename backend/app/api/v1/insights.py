@@ -18,7 +18,7 @@ router = APIRouter(prefix="/insights", tags=["insights"])
 def insights(days: int = 14, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     days = max(1, min(days, 90))
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    q = lambda: db.query(Event).filter(Event.user_id == user.id, Event.timestamp >= since)  # noqa: E731
+    q = lambda: db.query(Event).filter(Event.user_id == user.id, Event.timestamp >= since)
 
     # activity by hour of day (UTC)
     hourly = dict.fromkeys(range(24), 0)

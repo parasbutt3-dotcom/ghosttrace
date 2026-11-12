@@ -1,11 +1,10 @@
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import String, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.config import settings
 
 
 class OAuthState(Base):
@@ -21,4 +20,4 @@ class OAuthState(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc) + timedelta(minutes=10))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    user: Mapped["User | None"] = relationship(back_populates="oauth_states")
+    user: Mapped["User | None"] = relationship(back_populates="oauth_states")  # type: ignore[name-defined]

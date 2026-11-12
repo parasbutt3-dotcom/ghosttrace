@@ -1,8 +1,7 @@
-from typing import Type
 
 from app.integrations.base import BaseIntegration
 
-_REGISTRY: dict[str, Type[BaseIntegration]] = {}
+_REGISTRY: dict[str, type[BaseIntegration]] = {}
 
 
 def register(kind: str):

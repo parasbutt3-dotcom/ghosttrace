@@ -1,17 +1,16 @@
+import logging
 import secrets
 import smtplib
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
-
-import logging
 
 from app.config import settings
 from app.database import get_db
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 logger = logging.getLogger("ghosttrace.auth")
 
@@ -28,13 +27,36 @@ except Exception as exc:
         exc,
     )
     limiter = Limiter(key_func=get_remote_address)
-from app.models.user import User
-from app.models.oauth_state import OAuthState
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, RefreshRequest, VerifyEmailRequest
-from app.schemas.user import UserOut
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token, new_state, new_pkce_verifier, pkce_challenge, revoke_refresh_token, is_token_revoked, encrypt_secret, decrypt_secret, token_precedes_cutoff, generate_recovery_codes, consume_recovery_code
-from app.schemas.auth import ChangePasswordRequest, DeleteAccountRequest
 from app.api.deps import get_current_user
+from app.core.security import (
+    consume_recovery_code,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    decrypt_secret,
+    encrypt_secret,
+    generate_recovery_codes,
+    hash_password,
+    is_token_revoked,
+    new_pkce_verifier,
+    new_state,
+    pkce_challenge,
+    revoke_refresh_token,
+    token_precedes_cutoff,
+    verify_password,
+)
+from app.models.oauth_state import OAuthState
+from app.models.user import User
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    DeleteAccountRequest,
+    LoginRequest,
+    RefreshRequest,
+    RegisterRequest,
+    TokenResponse,
+    VerifyEmailRequest,
+)
+from app.schemas.user import UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -187,7 +209,7 @@ def refresh(req: RefreshRequest, request: Request, db: Session = Depends(get_db)
         raise HTTPException(status_code=401, detail="Session revoked, sign in again")
     # rotate: revoke old (keep original expiry to avoid extending lifetime)
     if jti:
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
         exp = payload.get("exp")
         expires_at = datetime.fromtimestamp(exp, tz=timezone.utc) if exp else datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         revoke_refresh_token(db, jti, expires_at)
@@ -208,7 +230,7 @@ def logout(req: RefreshRequest | None = None, user: User = Depends(get_current_u
     if req and req.refresh_token:
         p = decode_token(req.refresh_token)
         if p and p.get("type") == "refresh" and p.get("jti"):
-            from datetime import datetime, timezone, timedelta
+            from datetime import datetime, timedelta, timezone
             revoke_refresh_token(db, p["jti"], datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
     _audit(db, user.id, "auth.logout")
     return {"ok": True}
@@ -249,7 +271,6 @@ def delete_account(req: DeleteAccountRequest, request: Request,
         raise HTTPException(status_code=401, detail="Password incorrect")
     # Best-effort OAuth revocation before wiping rows.
     from app.models.account import ConnectedAccount
-    from app.core.security import decrypt_secret
     for acct in db.query(ConnectedAccount).filter(ConnectedAccount.user_id == user.id).all():
         if acct.provider == "google":
             tok = decrypt_secret(acct.access_token_enc or "") or decrypt_secret(acct.refresh_token_enc or "")
@@ -290,7 +311,6 @@ def mfa_setup(user: User = Depends(get_current_user), db: Session = Depends(get_
 @router.post("/mfa/verify")
 def mfa_verify(code: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     import pyotp
-    from app.core.security import decrypt_secret
     if not user.mfa_secret_enc:
         raise HTTPException(status_code=400, detail="Run setup first")
     secret = decrypt_secret(user.mfa_secret_enc)
@@ -306,7 +326,6 @@ def mfa_verify(code: str, user: User = Depends(get_current_user), db: Session = 
 @router.post("/mfa/disable")
 def mfa_disable(code: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     import pyotp
-    from app.core.security import decrypt_secret
     if not user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA not enabled")
     secret = decrypt_secret(user.mfa_secret_enc or "")
@@ -323,7 +342,6 @@ def mfa_disable(code: str, user: User = Depends(get_current_user), db: Session =
 
 @router.post("/mfa/recovery-codes")
 def mfa_recovery_codes_regenerate(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    import pyotp
     if not user.mfa_enabled or not user.mfa_secret_enc:
         raise HTTPException(status_code=400, detail="MFA not enabled")
     plain, stored = generate_recovery_codes()
@@ -336,7 +354,6 @@ def mfa_recovery_codes_regenerate(user: User = Depends(get_current_user), db: Se
 @router.post("/mfa/login", response_model=TokenResponse)
 def mfa_login(mfa_token: str, code: str, request: Request, db: Session = Depends(get_db)):
     import pyotp
-    from app.core.security import decrypt_secret
     payload = decode_token(mfa_token)
     if not payload or payload.get("type") != "mfa_pending":
         raise HTTPException(status_code=401, detail="Invalid mfa token")
@@ -362,8 +379,8 @@ def mfa_login(mfa_token: str, code: str, request: Request, db: Session = Depends
 
 @router.get("/sessions")
 def list_sessions(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    from app.models.session import UserSession
     from app.core.security import ensure_utc
+    from app.models.session import UserSession
     current_jti = None
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -376,7 +393,7 @@ def list_sessions(request: Request, user: User = Depends(get_current_user), db: 
         out.append({
             "id": s.id, "ip_address": s.ip_address, "user_agent": s.user_agent,
             "created_at": created.isoformat() if created else None,
-            "last_seen_at": ensure_utc(s.last_seen_at).isoformat() if s.last_seen_at else None,
+            "last_seen_at": (x.isoformat() if (x := ensure_utc(s.last_seen_at)) else None),
             "current": bool(current_jti) and s.jti == current_jti,
             "revoked": s.revoked,
         })
@@ -445,8 +462,10 @@ def google_login(include_gmail: bool = False, include_calendar: bool = False, in
 
 @router.get("/google/callback")
 def google_callback(code: str | None = None, state: str | None = None, error: str | None = None, db: Session = Depends(get_db)):
-    import httpx
     from datetime import timedelta
+
+    import httpx
+
     from app.core.security import encrypt_secret, ensure_utc
     from app.models.account import ConnectedAccount
     from app.models.integration import Integration
@@ -466,7 +485,8 @@ def google_callback(code: str | None = None, state: str | None = None, error: st
         return _fail("missing_code_or_state")
 
     os_row = db.query(OAuthState).filter(OAuthState.state == state).first()
-    if not os_row or ensure_utc(os_row.expires_at) < datetime.now(timezone.utc):
+    _exp = ensure_utc(os_row.expires_at) if os_row else None
+    if not os_row or (_exp is not None and _exp < datetime.now(timezone.utc)) or _exp is None:
         return _fail("invalid_or_expired_state")
     user_id = os_row.user_id
     verifier = os_row.code_verifier

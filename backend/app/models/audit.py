@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import JSON, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -21,4 +21,4 @@ class AuditLog(Base):
     status: Mapped[str] = mapped_column(String(32), default="success")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
-    user: Mapped["User | None"] = relationship(back_populates="audit_logs")
+    user: Mapped["User | None"] = relationship(back_populates="audit_logs")  # type: ignore[name-defined]

@@ -1,11 +1,12 @@
 import logging
+from datetime import datetime, timezone
+from typing import Any
 
 import httpx
-from datetime import datetime, timezone
 
+from app.core.security import decrypt_secret
 from app.integrations.base import BaseIntegration, Capability
 from app.integrations.registry import register
-from app.core.security import decrypt_secret
 
 logger = logging.getLogger("ghosttrace.integrations.github")
 
@@ -61,7 +62,7 @@ class GitHubIntegration(BaseIntegration):
 
     async def sync(self):
         username = self._username()
-        summary = {"ok": False, "events_created": 0}
+        summary: dict[str, Any] = {"ok": False, "events_created": 0}
         if not username:
             summary["error"] = "username not configured"
             if self.integration:

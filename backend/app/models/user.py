@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, DateTime, Boolean, JSON
+from sqlalchemy import JSON, Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -51,11 +51,11 @@ class User(Base):
     def is_email_verified(self, v):
         self.email_verified = bool(v)
 
-    accounts: Mapped[list["ConnectedAccount"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    integrations: Mapped[list["Integration"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    devices: Mapped[list["Device"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    events: Mapped[list["Event"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    oauth_states: Mapped[list["OAuthState"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    api_keys: Mapped[list["ApiKey"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821
-    sessions: Mapped[list["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821
+    accounts: Mapped[list["ConnectedAccount"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # type: ignore[name-defined]
+    integrations: Mapped[list["Integration"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # type: ignore[name-defined]
+    devices: Mapped[list["Device"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # type: ignore[name-defined]
+    events: Mapped[list["Event"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # type: ignore[name-defined]
+    audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # type: ignore[name-defined]
+    oauth_states: Mapped[list["OAuthState"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # type: ignore[name-defined]
+    api_keys: Mapped[list["ApiKey"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # type: ignore[name-defined]
+    sessions: Mapped[list["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # type: ignore[name-defined]

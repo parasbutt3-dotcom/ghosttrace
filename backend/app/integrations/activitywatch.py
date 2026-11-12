@@ -1,5 +1,7 @@
-import httpx
 from datetime import datetime, timezone
+from typing import Any
+
+import httpx
 
 from app.integrations.base import BaseIntegration, Capability
 from app.integrations.registry import register
@@ -25,7 +27,7 @@ class ActivityWatchIntegration(BaseIntegration):
 
     async def sync(self):
         base = self._base_url()
-        summary = {"ok": False, "events_created": 0, "buckets": []}
+        summary: dict[str, Any] = {"ok": False, "events_created": 0, "buckets": []}
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 r = await client.get(f"{base}/api/0/buckets", timeout=10)
@@ -45,7 +47,7 @@ class ActivityWatchIntegration(BaseIntegration):
 
         from app.services.events import ingest_event
         async with httpx.AsyncClient(timeout=30) as client:
-            for bid, info in buckets.items():
+            for bid in buckets:
                 try:
                     r = await client.get(f"{base}/api/0/buckets/{bid}/events", params={"limit": 200})
                     if r.status_code != 200:
@@ -73,7 +75,8 @@ class ActivityWatchIntegration(BaseIntegration):
                         )
                         summary["events_created"] += 1
                 except Exception as e:
-                    summary.setdefault("bucket_errors", {})[bid] = str(e)
+                    summary.setdefault("bucket_errors", {})
+                    summary["bucket_errors"][bid] = str(e)
 
         if self.integration:
             self.integration.last_sync_at = datetime.now(timezone.utc)

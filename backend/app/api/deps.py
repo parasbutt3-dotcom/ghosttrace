@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.security import decode_token, hash_api_key, token_precedes_cutoff
 from app.database import get_db
 from app.models.user import User
-from app.core.security import decode_token, token_precedes_cutoff, hash_api_key
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -14,7 +14,7 @@ bearer = HTTPBearer(auto_error=False)
 def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: Session = Depends(get_db),
-    request: Request = None,
+    request: Request = None,  # type: ignore[assignment]
 ) -> User:
     if creds is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")

@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 
-from app.models.integration import Integration
-from app.models.account import ConnectedAccount
 from app.integrations.registry import get_integration_class
+from app.models.account import ConnectedAccount
+from app.models.integration import Integration
 
 
 def build_integration(db: Session, user_id: str, integ: Integration):

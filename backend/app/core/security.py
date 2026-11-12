@@ -80,7 +80,8 @@ def is_token_revoked(db, jti: str) -> bool:
     row = db.query(RevokedToken).filter(RevokedToken.jti == jti).first()
     if not row:
         return False
-    if ensure_utc(row.expires_at) < datetime.now(timezone.utc):
+    exp = ensure_utc(row.expires_at)
+    if exp is not None and exp < datetime.now(timezone.utc):
         db.delete(row)
         db.commit()
         return False
@@ -88,7 +89,7 @@ def is_token_revoked(db, jti: str) -> bool:
 
 
 def _fernet() -> Fernet:
-    key = settings.TOKEN_ENCRYPTION_KEY
+    key: str | bytes = settings.TOKEN_ENCRYPTION_KEY
     if not key:
         # Derive a deterministic key from SECRET_KEY for dev only.
         digest = hashlib.sha256(settings.SECRET_KEY.encode()).digest()

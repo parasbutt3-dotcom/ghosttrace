@@ -23,14 +23,15 @@ scheduler = None
 
 
 async def sync_due_integrations(db: Session) -> int:
-    from app.services.integrations import build_integration
     from app.core.security import ensure_utc
+    from app.services.integrations import build_integration
     interval = timedelta(minutes=settings.SYNC_INTERVAL_MINUTES)
     now = datetime.now(timezone.utc)
-    due = [
-        i for i in db.query(Integration).filter(Integration.enabled == True).all()  # noqa: E712
-        if ensure_utc(i.last_sync_at) is None or ensure_utc(i.last_sync_at) < now - interval
-    ]
+    due = []
+    for i in db.query(Integration).filter(Integration.enabled == True).all():
+        last = ensure_utc(i.last_sync_at)
+        if last is None or last < now - interval:
+            due.append(i)
     synced = 0
     for integ in due:
         inst = build_integration(db, integ.user_id, integ)
@@ -74,7 +75,7 @@ def run_retention(db: Session) -> int:
     cutoff = datetime.now(timezone.utc) - timedelta(days=settings.EVENT_RETENTION_DAYS)
     res = db.execute(delete(Event).where(Event.timestamp < cutoff))
     db.commit()
-    return res.rowcount
+    return int(getattr(res, "rowcount", 0) or 0)
 
 
 def _tick() -> None:

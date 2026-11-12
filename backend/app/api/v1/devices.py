@@ -2,18 +2,18 @@ import hashlib
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.v1.auth import limiter
 from app.database import get_db
-from app.models.user import User
 from app.models.device import Device
 from app.models.integration import Integration
+from app.models.user import User
 from app.schemas.account import DeviceOut
 from app.schemas.device import TelemetryIn
 from app.services.events import ingest_event
-from app.api.v1.auth import limiter
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -56,7 +56,7 @@ def register_device(name: str, device_type: str = "android", platform: str | Non
 
 @router.post("/telemetry")
 @limiter.limit("60/minute")
-def telemetry(payload: TelemetryIn, x_device_key: str = Header(..., alias="X-Device-Key"), request: Request = None, db: Session = Depends(get_db)):
+def telemetry(payload: TelemetryIn, x_device_key: str = Header(..., alias="X-Device-Key"), request: Request = None, db: Session = Depends(get_db)):  # type: ignore[assignment]
     dev = db.query(Device).filter(Device.device_key_hash == _hash_key(x_device_key)).first()
     if not dev:
         raise HTTPException(status_code=401, detail="invalid device key")
