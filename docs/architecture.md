@@ -16,7 +16,7 @@
 
 ## Components
 
-- Frontend: Next.js 14 App Router, Tailwind, Recharts, dark SOC theme.
+- Frontend: Next.js 16 App Router, Tailwind, Recharts, dark SOC theme.
 - Backend: FastAPI, SQLAlchemy 2.0, Pydantic v2, JWT sessions, Fernet token encryption.
 - Data: unified `events` table with dedup_key; accounts, integrations, devices, audit_logs.
 - Integrations: plugin registry (`app/integrations/registry.py`) with BaseIntegration subclasses: Google (Gmail alerts / Calendar / Drive scopes), ActivityWatch, Wazuh, GitHub (public + optional PAT), Android, iOS.

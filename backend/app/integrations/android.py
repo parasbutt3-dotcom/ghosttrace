@@ -11,7 +11,7 @@ class AndroidIntegration(BaseIntegration):
     def capabilities(self):
         return [
             Capability("device_registration", True, "Devices register with a device key"),
-            Capability("app_usage_stats", True, "Requires PACKAGE_USAGE_STATS permission on device"),
+            Capability("app_usage_stats", False, "companion does not collect usage stats yet"),
             Capability("battery", True, "Battery level reported by companion"),
             Capability("network", True, "Network type reported by companion"),
             Capability("location", True, "Only if user grants location permission to companion"),

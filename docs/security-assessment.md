@@ -17,8 +17,8 @@
 ## Known limitations / production hardening TODO
 
 - SQLite default; use PostgreSQL in production (docker-compose provided).
-- Rate limiting via slowapi on auth, telemetry, and events creation; add nginx for prod.
-- MFA (TOTP) implemented; recovery codes still TODO.
+- Rate limiting via slowapi on auth, telemetry, events, and takeout (in-memory storage today; Redis-backed storage is Phase 1.2); add nginx for prod.
+- MFA (TOTP) implemented with single-use recovery codes (10 per enrolment); recovery code flow is tested.
 - JWT revocation list implemented for refresh tokens; access tokens expire in 24h.
 - Android companion validated via Pydantic; treat as untrusted input.
 - Google Workspace admin APIs partially implemented (require domain admin).

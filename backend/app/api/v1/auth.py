@@ -5,12 +5,28 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+import logging
+
 from app.config import settings
 from app.database import get_db
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger("ghosttrace.auth")
+
+# Prefer Redis-backed storage so rate limits survive multiple workers/processes.
+# Degrade gracefully to in-memory storage when Redis is unreachable.
+try:
+    limiter = Limiter(key_func=get_remote_address, storage_uri=settings.REDIS_URL)
+    # Limiter construction does not actually connect; verify reachability now.
+    if not getattr(limiter._storage, "check", lambda: True)():
+        raise RuntimeError("Redis rate-limit storage is unreachable")
+except Exception as exc:
+    logger.warning(
+        "Redis unavailable for rate limiting; falling back to in-memory storage: %s",
+        exc,
+    )
+    limiter = Limiter(key_func=get_remote_address)
 from app.models.user import User
 from app.models.oauth_state import OAuthState
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, RefreshRequest

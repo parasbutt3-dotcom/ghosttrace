@@ -17,7 +17,8 @@ import app.integrations.github  # noqa
 from app.models.user import User
 from app.api.v1 import auth, integrations, events, devices, reports, security, admin, apikeys, rules, insights, takeout
 
-Base.metadata.create_all(bind=engine)
+if settings.APP_ENV == "development":
+    Base.metadata.create_all(bind=engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
