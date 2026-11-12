@@ -37,13 +37,30 @@ async def sync_due_integrations(db: Session) -> int:
         if not inst:
             continue
         try:
-            await inst.sync()
+            result = await inst.sync()
             synced += 1
         except Exception as e:
             logger.warning("scheduled sync failed for integration %s: %s", integ.id, e)
             integ.status = "error"
             integ.last_error = str(e)[:500]
             db.commit()
+            result = {"ok": False, "error": str(e)}
+        # Alert delivery on sync errors.
+        try:
+            from app.models.user import User
+            from app.services.notifications import deliver_alert
+            user = db.get(User, integ.user_id)
+            if user and (integ.status == "error" or integ.last_error or (isinstance(result, dict) and not result.get("ok", True))):
+                deliver_alert(db, user, {
+                    "fingerprint": f"integration_failure:{integ.id}",
+                    "severity": "medium",
+                    "type": "integration_failure",
+                    "title": f"Integration '{integ.name}' has errors",
+                    "detail": integ.last_error or (result.get("error") if isinstance(result, dict) else None) or "status=error",
+                    "resource_id": integ.id,
+                })
+        except Exception:
+            pass
     return synced
 
 

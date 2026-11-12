@@ -172,6 +172,19 @@ export default function SettingsPage() {
       </div>
 
       <div className="bg-[#0d1224] border border-slate-800 rounded-xl p-5 space-y-4">
+        <h3 className="font-semibold">API guide (gt_ keys)</h3>
+        <p className="text-xs text-slate-500">Use a key from above as a Bearer token against the events API.</p>
+        <div className="space-y-2">
+          <div className="text-xs text-slate-400">List events:</div>
+          <pre className="bg-[#0a0e1a] border border-slate-800 rounded-lg p-2 overflow-auto text-[11px] text-slate-300">{`curl -H "Authorization: Bearer gt_YOUR_KEY" http://localhost:8000/api/v1/events`}</pre>
+          <div className="text-xs text-slate-400">Create an event:</div>
+          <pre className="bg-[#0a0e1a] border border-slate-800 rounded-lg p-2 overflow-auto text-[11px] text-slate-300">{`curl -X POST -H "Authorization: Bearer gt_YOUR_KEY" -H "Content-Type: application/json" -d '{"source":"script","event_type":"note.created","description":"hello"}' http://localhost:8000/api/v1/events`}</pre>
+          <div className="text-xs text-slate-400">Stats:</div>
+          <pre className="bg-[#0a0e1a] border border-slate-800 rounded-lg p-2 overflow-auto text-[11px] text-slate-300">{`curl -H "Authorization: Bearer gt_YOUR_KEY" http://localhost:8000/api/v1/events/stats`}</pre>
+        </div>
+      </div>
+
+      <div className="bg-[#0d1224] border border-slate-800 rounded-xl p-5 space-y-4">
         <h3 className="font-semibold">Change password</h3>
         <p className="text-xs text-slate-500">Changing your password signs you out of every session.</p>
         <div className="flex flex-col md:flex-row gap-2">

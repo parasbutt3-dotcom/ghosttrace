@@ -27,12 +27,14 @@ export interface Capability { name: string; available: boolean; reason: string; 
 
 export interface Integration {
   id: string; kind: string; name: string; enabled: boolean; status: string;
-  last_sync_at: string | null; last_error: string | null; created_at: string;
+  last_sync_at: string | null; last_error: string | null; last_sync_summary?: Record<string, unknown> | null;
+  created_at: string;
 }
 
 export interface IntegrationDetails {
   id: string; kind: string; name: string; status: string; last_sync_at: string | null;
-  last_error: string | null; config: Record<string, unknown>; capabilities: Capability[];
+  last_error: string | null; last_sync_summary?: Record<string, unknown> | null;
+  config: Record<string, unknown>; capabilities: Capability[];
 }
 
 export interface ConnectedAccount {

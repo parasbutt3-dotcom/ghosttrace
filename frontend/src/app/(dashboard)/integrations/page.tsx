@@ -211,6 +211,12 @@ export default function IntegrationsPage() {
               </div>
             ))}
           </div>
+          {details.last_sync_summary && (
+            <div className="mt-3">
+              <div className="text-xs text-slate-500 mb-1">Last sync summary</div>
+              <pre className="bg-[#0a0e1a] border border-slate-800 rounded-lg p-2 overflow-auto text-[11px] text-slate-300">{JSON.stringify(details.last_sync_summary, null, 2)}</pre>
+            </div>
+          )}
           <button onClick={() => setDetails(null)} className="mt-3 text-xs text-slate-400">Close</button>
         </div>
       )}

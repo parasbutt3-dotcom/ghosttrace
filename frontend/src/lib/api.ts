@@ -93,6 +93,7 @@ export const integrationsApi = {
   create: (kind: string, name: string, config?: Record<string, unknown>) =>
     api.post("/api/v1/integrations", config ?? {}, { params: { kind, name } }),
   get: (id: string) => api.get<IntegrationDetails>(`/api/v1/integrations/${id}`),
+  summary: (id: string) => api.get<Record<string, unknown>>(`/api/v1/integrations/${id}/summary`),
   sync: (id: string) => api.post<Record<string, unknown>>(`/api/v1/integrations/${id}/sync`),
   delete: (id: string) => api.delete(`/api/v1/integrations/${id}`),
   disconnectAccount: (id: string) => api.delete(`/api/v1/integrations/accounts/${id}`),

@@ -27,6 +27,8 @@ class User(Base):
     email_verify_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     verify_email_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     verification_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    # Optional webhook URL for alert delivery (httpx POST).
+    webhook_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     # Tokens issued before this instant are dead (used by logout-all).
     sessions_invalid_before: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

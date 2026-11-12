@@ -73,7 +73,8 @@ def get_(integ_id: str, user: User = Depends(get_current_user), db: Session = De
     caps = [c.to_dict() for c in inst.capabilities()] if inst else []
     return {"id": integ.id, "kind": integ.kind, "name": integ.name, "status": integ.status,
             "last_sync_at": integ.last_sync_at.isoformat() if integ.last_sync_at else None,
-            "last_error": integ.last_error, "config": integ.config, "capabilities": caps}
+            "last_error": integ.last_error, "last_sync_summary": integ.last_sync_summary,
+            "config": integ.config, "capabilities": caps}
 
 
 @router.post("/{integ_id}/sync")
@@ -84,8 +85,54 @@ async def sync(integ_id: str, user: User = Depends(get_current_user), db: Sessio
     inst = build_integration(db, user.id, integ)
     if not inst:
         raise HTTPException(status_code=400, detail="unsupported kind")
-    result = await inst.sync()
+    try:
+        result = await inst.sync()
+    except Exception as e:
+        result = {"ok": False, "error": str(e)}
+    # Persist the last sync summary so it survives reloads.
+    db.refresh(integ)
+    try:
+        integ.last_sync_summary = result
+    except Exception:
+        pass
+    integ.last_sync_at = integ.last_sync_at or None
+    db.commit()
+    # Alert delivery on sync errors.
+    try:
+        if not (isinstance(result, dict) and result.get("ok", True)) or integ.status == "error" or integ.last_error:
+            from app.services.notifications import deliver_alert
+            alert = {
+                "fingerprint": f"integration_failure:{integ.id}",
+                "severity": "medium",
+                "type": "integration_failure",
+                "title": f"Integration '{integ.name}' has errors",
+                "detail": integ.last_error or (result.get("error") if isinstance(result, dict) else None) or "status=error",
+                "resource_id": integ.id,
+            }
+            deliver_alert(db, user, alert)
+    except Exception:
+        pass
     return result
+
+
+@router.get("/{integ_id}/summary")
+def sync_summary(integ_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    integ = get_integration(db, user.id, integ_id)
+    if not integ:
+        raise HTTPException(status_code=404, detail="not found")
+    return {"id": integ.id, "kind": integ.kind, "name": integ.name, "status": integ.status,
+            "last_sync_at": integ.last_sync_at.isoformat() if integ.last_sync_at else None,
+            "last_error": integ.last_error, "last_sync_summary": integ.last_sync_summary}
+
+
+@router.get("/{integ_id}/sync-summary")
+def sync_summary_alias(integ_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return sync_summary(integ_id, user, db)
+
+
+@router.get("/{integ_id}/last-sync")
+def last_sync_alias(integ_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return sync_summary(integ_id, user, db)
 
 
 @router.delete("/{integ_id}")

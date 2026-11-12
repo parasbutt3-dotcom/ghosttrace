@@ -64,6 +64,7 @@ def rule_alerts(db: Session, user_id: str) -> list[dict]:
                 "severity": rule.severity, "type": "detection_rule", "title": rule.name,
                 "detail": f"{count} matching events in {rule.window_hours}h (threshold {rule.min_count})",
                 "resource_id": rule.id,
+                "fingerprint": f"detection_rule:{rule.id}",
             })
     return alerts
 

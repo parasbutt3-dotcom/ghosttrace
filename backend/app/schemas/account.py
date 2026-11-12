@@ -25,6 +25,7 @@ class IntegrationOut(BaseModel):
     status: str
     last_sync_at: Any = None
     last_error: str | None = None
+    last_sync_summary: Any = None
     config: Any = None
     created_at: Any = None
 
