@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r backend/requirements.txt
+      - working-directory: backend
+        run: python -m pytest -q
+      - working-directory: backend
+        run: python -c "import app.main; print('import ok')"
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - working-directory: frontend
+        run: npm ci
+      - working-directory: frontend
+        run: npm run lint
+      - working-directory: frontend
+        run: npm run build
+
+  ios-typecheck:
+    # Compiles the companion sources on real Apple hardware.
+    # UIKit-only paths are behind #if canImport(UIKit); CoreLocation,
+    # EventKit and Network exist on macOS, so the same files type-check
+    # against the macOS SDK — catching syntax/API errors without a Mac.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Type-check iOS companion
+        run: |
+          xcrun swiftc -typecheck \
+            ios/TelemetryService.swift \
+            ios/LocationCollector.swift \
+            ios/CalendarCollector.swift
