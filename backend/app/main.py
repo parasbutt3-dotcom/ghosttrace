@@ -1,10 +1,18 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends
+# Optional Sentry/GlitchTip init (no-op when SENTRY_DSN is unset).
+from app.config import settings
+if getattr(settings, "SENTRY_DSN", ""):
+    try:
+        import sentry_sdk
+        sentry_sdk.init(dsn=settings.SENTRY_DSN, environment=settings.APP_ENV)
+    except Exception:
+        pass
+
+from fastapi import FastAPI, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
 from app.database import Base, engine, get_db
 from app.api.deps import get_current_user
 from app.models import *  # noqa
@@ -16,22 +24,22 @@ import app.integrations.ios  # noqa
 import app.integrations.github  # noqa
 from app.models.user import User
 from app.api.v1 import auth, integrations, events, devices, reports, security, admin, apikeys, rules, insights, takeout
+from app.metrics import HTTP_REQUESTS_TOTAL, metrics_text
 
 if settings.APP_ENV == "development":
     Base.metadata.create_all(bind=engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    stop = asyncio.Event()
-    task = None
+    scheduler = None
     if settings.AUTO_SYNC_ENABLED:
-        from app.services.scheduler import scheduler_loop
-        task = asyncio.create_task(scheduler_loop(stop))
+        from app.services.scheduler import start_scheduler
+        scheduler = start_scheduler()
+        app.state.scheduler = scheduler
     yield
-    if task:
-        stop.set()
-        task.cancel()
-
+    if scheduler is not None:
+        from app.services.scheduler import stop_scheduler
+        stop_scheduler(scheduler)
 
 app = FastAPI(title=settings.APP_NAME, version="0.1.0", debug=settings.DEBUG, lifespan=lifespan)
 from slowapi import _rate_limit_exceeded_handler
@@ -61,6 +69,20 @@ async def security_headers(request, call_next):
     return response
 
 
+@app.middleware("http")
+async def metrics_http_middleware(request, call_next):
+    response = await call_next(request)
+    try:
+        HTTP_REQUESTS_TOTAL.labels(
+            method=request.method,
+            path=request.url.path,
+            status_code=str(response.status_code),
+        ).inc()
+    except Exception:
+        pass
+    return response
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "app": settings.APP_NAME}
@@ -74,6 +96,13 @@ def ready(db=Depends(get_db)):
     except Exception as e:
         from fastapi import HTTPException
         raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.get("/metrics")
+def metrics():
+    from app.metrics import refresh_scheduler_age
+    refresh_scheduler_age()
+    return Response(content=metrics_text(), media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 @app.get("/api/v1/overview")

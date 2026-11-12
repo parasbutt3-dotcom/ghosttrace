@@ -1,0 +1,7 @@
+[Unit]
+Description=GHOSTTRACE application target
+Wants=ghosttrace-backend.service ghosttrace-frontend.service
+After=ghosttrace-backend.service ghosttrace-frontend.service
+
+[Install]
+WantedBy=multi-user.target

@@ -3,6 +3,11 @@ from sqlalchemy.orm import Session
 
 from app.models.event import Event
 
+try:
+    from app.metrics import EVENTS_INGESTED_TOTAL
+except Exception:  # pragma: no cover
+    EVENTS_INGESTED_TOTAL = None
+
 
 def _parse_ts(ts):
     if ts is None:
@@ -53,6 +58,11 @@ def ingest_event(db: Session, user_id: str, *, source: str, event_type: str,
     db.add(ev)
     db.commit()
     db.refresh(ev)
+    if EVENTS_INGESTED_TOTAL is not None:
+        try:
+            EVENTS_INGESTED_TOTAL.labels(source=source).inc()
+        except Exception:
+            pass
     return ev
 
 

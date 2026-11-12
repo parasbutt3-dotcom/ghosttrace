@@ -1,0 +1,24 @@
+[Unit]
+Description=GHOSTTRACE FastAPI backend (uvicorn)
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=ghosttrace
+Group=ghosttrace
+WorkingDirectory=/opt/ghosttrace/backend
+EnvironmentFile=/etc/ghosttrace/.env
+ExecStart=/opt/ghosttrace/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

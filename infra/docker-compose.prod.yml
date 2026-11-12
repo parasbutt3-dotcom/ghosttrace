@@ -1,0 +1,108 @@
+# GHOSTTRACE — production compose stack (no builds; uses published image refs).
+# Usage:
+#   cp .env.example .env   # then fill in secrets (see docs/deployment.md)
+#   docker compose -f infra/docker-compose.prod.yml up -d
+#
+# Build/push the app images first (CI does this), or load them locally:
+#   docker build -t ghosttrace/backend:latest ./backend
+#   docker build -t ghosttrace/frontend:latest ./frontend --build-arg NEXT_PUBLIC_API_URL=https://ghosttrace.example.com
+
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ghosttrace
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ghosttrace}
+      POSTGRES_DB: ghosttrace
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghosttrace -d ghosttrace"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [ghosttrace]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [ghosttrace]
+
+  backend:
+    image: ghosttrace/backend:latest
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      DATABASE_URL: postgresql+psycopg2://ghosttrace:${POSTGRES_PASSWORD:-ghosttrace}@db:5432/ghosttrace
+      REDIS_URL: redis://redis:6379/0
+      FRONTEND_URL: https://ghosttrace.example.com
+      CORS_ORIGINS: https://ghosttrace.example.com
+      GOOGLE_REDIRECT_URI: https://ghosttrace.example.com/api/v1/auth/google/callback
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks: [ghosttrace]
+
+  frontend:
+    image: ghosttrace/frontend:latest
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://ghosttrace.example.com
+    depends_on:
+      - backend
+    networks: [ghosttrace]
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../infra/nginx.conf:/etc/nginx/nginx.conf:ro
+      - certbot-etc:/etc/letsencrypt:ro
+      - certbot-var:/var/lib/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    networks: [ghosttrace]
+
+  certbot:
+    image: certbot/certbot:latest
+    restart: "no"
+    entrypoint: >
+      /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h; done"
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    networks: [ghosttrace]
+
+volumes:
+  pgdata:
+  redisdata:
+  certbot-etc:
+  certbot-var:
+  certbot-webroot:
+
+networks:
+  ghosttrace:
+    driver: bridge

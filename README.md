@@ -20,7 +20,7 @@ See docs/installation.md.
 - docs/architecture.md
 - docs/security-assessment.md
 - docs/installation.md
-
+- docs/deployment.md
 ## License
 
 MIT (original code). Integrations use upstream projects' APIs only; see research-report.md for attribution.

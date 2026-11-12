@@ -1,11 +1,7 @@
 """Background sync + retention loop.
 
-Runs every SYNC_INTERVAL_MINUTES:
-- syncs enabled integrations whose last sync is older than the interval
-- deletes events past EVENT_RETENTION_DAYS
-
-Designed for single-process dev; production would use Celery/APScheduler,
-but keeping zero extra deps means the loop is testable and starts with the app.
+Uses APScheduler's ``BackgroundScheduler``. Honours ``AUTO_SYNC_ENABLED``,
+``SYNC_INTERVAL_MINUTES`` and ``EVENT_RETENTION_DAYS``.
 """
 import asyncio
 import logging
@@ -16,10 +12,14 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import SessionLocal
+from app.metrics import SYNC_FAILURES_TOTAL, record_scheduler_run
 from app.models.event import Event
 from app.models.integration import Integration
 
 logger = logging.getLogger("ghosttrace.scheduler")
+
+_scheduler = None
+scheduler = None
 
 
 async def sync_due_integrations(db: Session) -> int:
@@ -45,6 +45,12 @@ async def sync_due_integrations(db: Session) -> int:
             integ.last_error = str(e)[:500]
             db.commit()
             result = {"ok": False, "error": str(e)}
+        # Count sync failures (exception or reported failure).
+        if isinstance(result, dict) and not result.get("ok", True):
+            try:
+                SYNC_FAILURES_TOTAL.labels(kind=integ.kind).inc()
+            except Exception:
+                pass
         # Alert delivery on sync errors.
         try:
             from app.models.user import User
@@ -71,22 +77,75 @@ def run_retention(db: Session) -> int:
     return res.rowcount
 
 
-async def scheduler_loop(stop: asyncio.Event):
-    logger.info("scheduler started (interval=%sm, retention=%sd)",
-                settings.SYNC_INTERVAL_MINUTES, settings.EVENT_RETENTION_DAYS)
-    while not stop.is_set():
-        db = SessionLocal()
+def _tick() -> None:
+    logger.info("scheduler tick starting")
+    db = SessionLocal()
+    try:
+        synced = asyncio.run(sync_due_integrations(db))
+        deleted = run_retention(db)
+        if synced or deleted:
+            logger.info("scheduler tick: synced=%d retention_deleted=%d", synced, deleted)
+    except Exception as e:
+        logger.warning("scheduler tick failed: %s", e)
+    finally:
+        db.close()
+    record_scheduler_run()
+
+
+def start_scheduler():
+    global _scheduler
+    if not settings.AUTO_SYNC_ENABLED:
+        logger.info("auto sync disabled; scheduler not started")
+        return None
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    interval = max(1, int(settings.SYNC_INTERVAL_MINUTES))
+    sched = BackgroundScheduler(daemon=True)
+    sched.add_job(
+        _tick,
+        trigger=IntervalTrigger(minutes=interval),
+        id="ghosttrace-sync",
+        replace_existing=True,
+        next_run_time=datetime.now(timezone.utc),
+        max_instances=1,
+        coalesce=True,
+    )
+    sched.start()
+    global scheduler
+    _scheduler = sched
+    scheduler = sched
+    logger.info("scheduler started (interval=%sm, retention=%sd)", interval, settings.EVENT_RETENTION_DAYS)
+    return sched
+
+
+def stop_scheduler(sched=None) -> None:
+    global _scheduler, scheduler
+    target = sched if sched is not None else _scheduler
+    if target is not None:
         try:
-            synced = await sync_due_integrations(db)
-            deleted = run_retention(db)
-            if synced or deleted:
-                logger.info("scheduler tick: synced=%d retention_deleted=%d", synced, deleted)
-        except Exception as e:
-            logger.warning("scheduler tick failed: %s", e)
-        finally:
-            db.close()
-        try:
-            await asyncio.wait_for(stop.wait(), timeout=settings.SYNC_INTERVAL_MINUTES * 60)
-        except asyncio.TimeoutError:
+            target.shutdown(wait=False)
+        except Exception:
             pass
+    _scheduler = None
+    scheduler = None
     logger.info("scheduler stopped")
+
+
+async def scheduler_loop(stop=None):
+    """Compatibility shim for the previous asyncio-based loop."""
+    sched = start_scheduler() if settings.AUTO_SYNC_ENABLED else None
+    if stop is not None and hasattr(stop, "wait"):
+        try:
+            await stop.wait()
+        except Exception:
+            pass
+    else:
+        # keep running until cancelled
+        import asyncio as _a
+        try:
+            while True:
+                await _a.sleep(3600)
+        except (asyncio.CancelledError, Exception):
+            pass
+    stop_scheduler(sched)

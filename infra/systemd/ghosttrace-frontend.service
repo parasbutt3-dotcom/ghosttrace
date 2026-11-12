@@ -1,0 +1,26 @@
+[Unit]
+Description=GHOSTTRACE Next.js frontend
+After=network.target ghosttrace-backend.service
+Wants=ghosttrace-backend.service
+
+[Service]
+Type=simple
+User=ghosttrace
+Group=ghosttrace
+WorkingDirectory=/opt/ghosttrace/frontend
+EnvironmentFile=/etc/ghosttrace/.env
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+Environment="NEXT_PUBLIC_API_URL=https://ghosttrace.example.com"
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

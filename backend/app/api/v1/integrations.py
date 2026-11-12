@@ -97,6 +97,13 @@ async def sync(integ_id: str, user: User = Depends(get_current_user), db: Sessio
         pass
     integ.last_sync_at = integ.last_sync_at or None
     db.commit()
+    # Metric: count sync failures.
+    try:
+        if not (isinstance(result, dict) and result.get("ok", True)) or integ.status == "error" or integ.last_error:
+            from app.metrics import SYNC_FAILURES_TOTAL
+            SYNC_FAILURES_TOTAL.labels(kind=integ.kind).inc()
+    except Exception:
+        pass
     # Alert delivery on sync errors.
     try:
         if not (isinstance(result, dict) and result.get("ok", True)) or integ.status == "error" or integ.last_error:

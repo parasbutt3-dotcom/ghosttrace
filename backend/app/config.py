@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     WAZUH_VERIFY_SSL: bool = True
     WAZUH_CA_BUNDLE: str = ""
 
+    # Observability (optional)
+    SENTRY_DSN: str = ""
+
     def cors_list(self):
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
