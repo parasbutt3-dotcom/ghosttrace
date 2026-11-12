@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     # Data retention
     EVENT_RETENTION_DAYS: int = 90
 
+    # Email verification (SMTP). When disabled (default dev), registration behaves
+    # exactly as before and no verification email is sent.
+    EMAIL_VERIFY_ENABLED: bool = False
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    FRONTEND_VERIFY_URL: str = ""
+
     # Background sync loop
     AUTO_SYNC_ENABLED: bool = True
     SYNC_INTERVAL_MINUTES: int = 60

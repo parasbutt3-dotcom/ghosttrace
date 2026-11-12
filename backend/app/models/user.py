@@ -20,10 +20,34 @@ class User(Base):
     mfa_secret_enc: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Single-use recovery codes: list of {"hash": sha256 hex, "used": bool}
     mfa_recovery_codes: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Email verification state.
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Verification token (stored in several alias columns for compatibility).
+    email_verification_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    email_verify_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    verify_email_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    verification_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     # Tokens issued before this instant are dead (used by logout-all).
     sessions_invalid_before: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Compatibility aliases for email_verified.
+    @property
+    def is_verified(self):
+        return self.email_verified
+
+    @is_verified.setter
+    def is_verified(self, v):
+        self.email_verified = bool(v)
+
+    @property
+    def is_email_verified(self):
+        return self.email_verified
+
+    @is_email_verified.setter
+    def is_email_verified(self, v):
+        self.email_verified = bool(v)
 
     accounts: Mapped[list["ConnectedAccount"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     integrations: Mapped[list["Integration"]] = relationship(back_populates="user", cascade="all, delete-orphan")

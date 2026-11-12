@@ -515,3 +515,16 @@ def test_takeout_import_and_dedup():
     # Bad upload rejected
     bad = client.post("/api/v1/takeout/import", files={"file": ("x.txt", b"not a zip", "text/plain")}, headers=h)
     assert bad.status_code == 422
+
+
+def test_health_security_headers():
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.headers.get("x-content-type-options") == "nosniff"
+    assert r.headers.get("x-frame-options") == "DENY"
+    assert r.headers.get("referrer-policy") == "no-referrer"
+    csp = r.headers.get("content-security-policy", "")
+    assert "default-src 'none'" in csp
+    assert "frame-ancestors 'none'" in csp
+    # HSTS is only sent in production; test env is development.
+    assert "strict-transport-security" not in r.headers

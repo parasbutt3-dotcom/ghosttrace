@@ -9,6 +9,7 @@ class UserOut(BaseModel):
     is_active: bool
     is_admin: bool
     mfa_enabled: bool = False
+    email_verified: bool = False
     created_at: Any
 
     model_config = {"from_attributes": True}

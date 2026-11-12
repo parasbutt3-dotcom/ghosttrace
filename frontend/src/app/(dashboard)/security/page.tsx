@@ -21,6 +21,7 @@ export default function SecurityPage() {
   const [rWin, setRWin] = useState("24");
   const [rSev, setRSev] = useState("medium");
   const [rMsg, setRMsg] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     securityApi.alerts().then((r) => setAlerts(r.data.alerts)).catch(() => setError("Failed to load alerts."));
@@ -41,18 +42,45 @@ export default function SecurityPage() {
     setRMsg("");
     if (!rName) { setRMsg("Rule needs a name."); return; }
     if (!rCat && !rType && !rSrc) { setRMsg("Set at least one filter."); return; }
+    const payload = {
+      name: rName,
+      category: rCat || undefined,
+      event_type: rType || undefined,
+      source: rSrc || undefined,
+      window_hours: Math.max(1, Number(rWin) || 24),
+      min_count: Math.max(1, Number(rMin) || 1),
+      severity: rSev,
+    };
     try {
-      await rulesApi.create({
-        name: rName,
-        category: rCat || undefined,
-        event_type: rType || undefined,
-        source: rSrc || undefined,
-        window_hours: Math.max(1, Number(rWin) || 24),
-        min_count: Math.max(1, Number(rMin) || 1),
-        severity: rSev,
-      });
-      setRName(""); setRMsg("Rule created."); load();
-    } catch (e) { setRMsg(errDetail(e, "Create failed")); }
+      if (editingId) {
+        await rulesApi.update(editingId, payload);
+        setRMsg("Rule updated.");
+      } else {
+        await rulesApi.create(payload);
+        setRMsg("Rule created.");
+      }
+      setRName(""); setRCat("security"); setRType(""); setRSrc(""); setRMin("1"); setRWin("24"); setRSev("medium"); setEditingId(null);
+      load();
+    } catch (e) { setRMsg(errDetail(e, editingId ? "Update failed" : "Create failed")); }
+  };
+  const editRule = (r: DetectionRule) => {
+    setEditingId(r.id);
+    setRName(r.name);
+    setRCat(r.category || "");
+    setRType(r.event_type || "");
+    setRSrc(r.source || "");
+    setRMin(String(r.min_count));
+    setRWin(String(r.window_hours));
+    setRSev(r.severity);
+    setRMsg("");
+  };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setRName(""); setRCat("security"); setRType(""); setRSrc(""); setRMin("1"); setRWin("24"); setRSev("medium"); setRMsg("");
+  };
+  const toggleRule = async (r: DetectionRule) => {
+    try { await rulesApi.toggle(r.id, !r.enabled); load(); }
+    catch (e) { setRMsg(errDetail(e, "Toggle failed")); }
   };
   const delRule = async (id: string) => { await rulesApi.delete(id).catch(() => {}); load(); };
 
@@ -82,6 +110,9 @@ export default function SecurityPage() {
               <span className="font-medium flex-1">{r.name}</span>
               <span className="text-xs text-slate-500">{[r.source && `source=${r.source}`, r.category && `cat=${r.category}`, r.event_type && `type=${r.event_type}`].filter(Boolean).join(" · ") || "any event"}</span>
               <span className="text-xs text-slate-500">≥{r.min_count}/{r.window_hours}h</span>
+              <span className={`text-xs ${r.enabled ? "text-green-400" : "text-slate-500"}`}>{r.enabled ? "on" : "off"}</span>
+              <button onClick={() => toggleRule(r)} className="text-xs text-cyan-400 hover:text-cyan-300">{r.enabled ? "Disable" : "Enable"}</button>
+              <button onClick={() => editRule(r)} className="text-xs text-slate-300 hover:text-white">Edit</button>
               <button onClick={() => delRule(r.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
             </div>
           ))}
@@ -94,7 +125,8 @@ export default function SecurityPage() {
           <div><label className="text-xs text-slate-500" htmlFor="rule-src">Source</label><input id="rule-src" value={rSrc} onChange={(e) => setRSrc(e.target.value)} placeholder="google" className="w-full bg-[#0a0e1a] border border-slate-700 rounded-lg px-3 py-2" /></div>
           <div><label className="text-xs text-slate-500">Min / hours</label><div className="flex gap-1"><input id="rule-min" aria-label="Minimum event count" value={rMin} onChange={(e) => setRMin(e.target.value)} className="w-12 bg-[#0a0e1a] border border-slate-700 rounded-lg px-2 py-2" /><input id="rule-win" aria-label="Window in hours" value={rWin} onChange={(e) => setRWin(e.target.value)} className="w-14 bg-[#0a0e1a] border border-slate-700 rounded-lg px-2 py-2" /></div></div>
           <div><label className="text-xs text-slate-500" htmlFor="rule-sev">Severity</label><select id="rule-sev" value={rSev} onChange={(e) => setRSev(e.target.value)} className="w-full bg-[#0a0e1a] border border-slate-700 rounded-lg px-2 py-2">{["info", "low", "medium", "high"].map((s) => <option key={s}>{s}</option>)}</select></div>
-          <button onClick={addRule} className="bg-cyan-600 hover:bg-cyan-500 rounded-lg px-3 py-2 text-sm">Add</button>
+          <button onClick={addRule} className="bg-cyan-600 hover:bg-cyan-500 rounded-lg px-3 py-2 text-sm">{editingId ? "Save" : "Add"}</button>
+          {editingId && <button onClick={cancelEdit} className="bg-slate-700 hover:bg-slate-600 rounded-lg px-3 py-2 text-sm">Cancel</button>}
         </div>
         {rMsg && <div className="text-xs text-slate-400 mt-2">{rMsg}</div>}
       </div>

@@ -1,7 +1,8 @@
 import secrets
+import smtplib
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -29,7 +30,7 @@ except Exception as exc:
     limiter = Limiter(key_func=get_remote_address)
 from app.models.user import User
 from app.models.oauth_state import OAuthState
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, RefreshRequest
+from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, RefreshRequest, VerifyEmailRequest
 from app.schemas.user import UserOut
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token, new_state, new_pkce_verifier, pkce_challenge, revoke_refresh_token, is_token_revoked, encrypt_secret, decrypt_secret, token_precedes_cutoff, generate_recovery_codes, consume_recovery_code
 from app.schemas.auth import ChangePasswordRequest, DeleteAccountRequest
@@ -61,7 +62,34 @@ def _issue_tokens(db, user, request=None, mfa=False):
     return TokenResponse(access_token=at, refresh_token=rt)
 
 
-@router.post("/register", response_model=TokenResponse)
+def send_verification_email(to_email: str, token: str):
+    """Send a verification link using stdlib smtplib. Best-effort: never blocks registration."""
+    if not settings.EMAIL_VERIFY_ENABLED:
+        return
+    link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+    # Allow an explicit override for the link target.
+    base = settings.FRONTEND_VERIFY_URL or settings.FRONTEND_URL
+    link = f"{base.rstrip('/')}/verify-email?token={token}"
+    try:
+        from email.message import EmailMessage
+        msg = EmailMessage()
+        msg["Subject"] = "Verify your email"
+        msg["From"] = settings.SMTP_USER or "noreply@ghosttrace.local"
+        msg["To"] = to_email
+        msg.set_content(f"Verify your Ghosttrace account: {link}\n\nToken: {token}")
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+            if settings.SMTP_USER:
+                try:
+                    server.starttls()
+                except Exception:
+                    pass
+                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.send_message(msg)
+    except Exception as exc:  # pragma: no cover - best effort
+        logger.warning("Failed to send verification email to %s: %s", to_email, exc)
+
+
+@router.post("/register")
 @limiter.limit("5/minute")
 def register(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == req.email).first()
@@ -72,6 +100,23 @@ def register(req: RegisterRequest, request: Request, db: Session = Depends(get_d
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Email verification (only active when EMAIL_VERIFY_ENABLED).
+    if settings.EMAIL_VERIFY_ENABLED:
+        token = secrets.token_urlsafe(32)
+        user.email_verification_token = token
+        user.email_verify_token = token
+        user.verify_email_token = token
+        user.verification_token = token
+        user.email_verified = False
+        db.commit()
+        db.refresh(user)
+        send_verification_email(user.email, token)
+        _audit(db, user.id, "auth.register", {"email": req.email, "email_verification": True}, request=request)
+        # Restricted state: no live tokens until the email is verified.
+        return {"ok": True, "message": "Verification email sent", "email": user.email,
+                "verification_token": token, "token": token,
+                "access_token": None, "refresh_token": None, "token_type": "bearer"}
     _audit(db, user.id, "auth.register", {"email": req.email}, request=request)
     return _issue_tokens(db, user, request)
 
@@ -84,11 +129,46 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User inactive")
+    if settings.EMAIL_VERIFY_ENABLED and not getattr(user, "email_verified", False):
+        raise HTTPException(status_code=403, detail="email not verified")
     if user.mfa_enabled:
         mfa_token = create_access_token(user.id, extra={"type": "mfa_pending"})
         return {"mfa_required": True, "mfa_token": mfa_token}
     _audit(db, user.id, "auth.login", {"email": req.email}, request=request)
     return _issue_tokens(db, user, request)
+
+
+@router.post("/verify-email")
+@limiter.limit("10/minute")
+def verify_email(request: Request, token: str | None = Query(None), db: Session = Depends(get_db),
+                req: VerifyEmailRequest | None = None):
+    if token is None and req is not None:
+        token = req.token
+    if not token:
+        raise HTTPException(status_code=422, detail="token required")
+    token_cols = [User.email_verification_token, User.email_verify_token,
+                  User.verify_email_token, User.verification_token]
+    user = None
+    for col in token_cols:
+        user = db.query(User).filter(col == token).first()
+        if user:
+            break
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+    # Mark verified and clear all token columns.
+    user.email_verified = True
+    user.email_verification_token = None
+    user.email_verify_token = None
+    user.verify_email_token = None
+    user.verification_token = None
+    db.commit()
+    db.refresh(user)
+    _audit(db, user.id, "auth.verify_email", {"email": user.email}, request=request)
+    # Issue tokens so the user can proceed immediately.
+    try:
+        return _issue_tokens(db, user, request)
+    except Exception:
+        return {"ok": True, "message": "Email verified"}
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -398,6 +478,8 @@ def google_callback(code: str | None = None, state: str | None = None, error: st
     user = db.get(User, user_id) if user_id else None
     if not user:
         return _fail("no_user_for_state")
+    # Google has verified this email address.
+    user.email_verified = True
 
     # Exchange code for tokens
     try:

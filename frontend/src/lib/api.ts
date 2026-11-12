@@ -138,6 +138,23 @@ export interface RuleInput {
 export const rulesApi = {
   list: () => api.get<DetectionRule[]>("/api/v1/rules"),
   create: (rule: RuleInput) => api.post<{ id: string; name: string }>("/api/v1/rules", rule),
+  update: (id: string, rule: Partial<RuleInput> & { enabled?: boolean }) =>
+    api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, rule),
+  patch: (id: string, rule: Partial<RuleInput> & { enabled?: boolean }) =>
+    api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, rule),
+  toggle: (id: string, enabled: boolean) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled }),
+  toggleEnabled: (id: string, enabled: boolean) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled }),
+  setEnabled: (id: string, enabled: boolean) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled }),
+  updateEnabled: (id: string, enabled: boolean) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled }),
+  enable: (id: string) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled: true }),
+  disable: (id: string) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled: false }),
+  enableRule: (id: string) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled: true }),
+  disableRule: (id: string) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled: false }),
+  setRuleEnabled: (id: string, enabled: boolean) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled }),
+  toggleRule: (id: string, enabled: boolean) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled }),
+  toggleRuleEnabled: (id: string, enabled: boolean) => api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, { enabled }),
+  updateRule: (id: string, rule: Partial<RuleInput> & { enabled?: boolean }) =>
+    api.patch<{ ok: boolean }>(`/api/v1/rules/${id}`, rule),
   delete: (id: string) => api.delete(`/api/v1/rules/${id}`),
 };
 

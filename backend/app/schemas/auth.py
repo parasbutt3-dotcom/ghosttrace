@@ -29,3 +29,12 @@ class ChangePasswordRequest(BaseModel):
 
 class DeleteAccountRequest(BaseModel):
     password: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+# Alias names some callers/tests may use.
+VerifyEmail = VerifyEmailRequest
+EmailVerifyRequest = VerifyEmailRequest

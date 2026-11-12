@@ -29,6 +29,18 @@ class RuleCreate(BaseModel):
     min_count: int = Field(default=1, ge=1, le=10000)
     severity: str = "medium"
 
+class RuleUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=512)
+    event_type: str | None = Field(default=None, max_length=128)
+    source: str | None = Field(default=None, max_length=128)
+    category: str | None = Field(default=None, max_length=64)
+    application: str | None = Field(default=None, max_length=255)
+    window_hours: int | None = Field(default=None, ge=1, le=720)
+    min_count: int | None = Field(default=None, ge=1, le=10000)
+    severity: str | None = None
+    enabled: bool | None = None
+
 
 def rule_alerts(db: Session, user_id: str) -> list[dict]:
     """Evaluate enabled detection rules against recent events; return alert dicts."""
@@ -81,15 +93,26 @@ def create_rule(req: RuleCreate, user: User = Depends(get_current_user), db: Ses
 
 
 @router.patch("/{rule_id}")
-def update_rule(rule_id: str, req: RuleCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def update_rule(rule_id: str, req: RuleUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rule = db.query(DetectionRule).filter(DetectionRule.id == rule_id, DetectionRule.user_id == user.id).first()
     if not rule:
         raise HTTPException(status_code=404, detail="not found")
-    if req.severity not in SEVERITIES:
+    data = req.model_dump(exclude_unset=True)
+    if "name" in data and data["name"] is None:
+        del data["name"]
+    if "severity" in data and data["severity"] is not None and data["severity"] not in SEVERITIES:
         raise HTTPException(status_code=422, detail="invalid severity")
-    for k, v in req.model_dump().items():
+    if "severity" in data and data["severity"] is None:
+        del data["severity"]
+    filters = ["event_type", "source", "category", "application"]
+    if any(f in data for f in filters):
+        new_vals = {f: data.get(f, getattr(rule, f)) for f in filters}
+        if not any(new_vals.values()):
+            raise HTTPException(status_code=422, detail="a rule needs at least one filter")
+    for k, v in data.items():
         setattr(rule, k, v)
     db.commit()
+    log_action(db, user.id, "rule.update", resource="rule", resource_id=rule_id)
     return {"ok": True}
 
 
