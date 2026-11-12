@@ -129,7 +129,9 @@ footer nav{display:flex;gap:20px}
       GHOSTTRACE
     </a>
     <nav class="nav-links" aria-label="Page">
+      <a href="#features">Features</a>
       <a href="#sources">Sources</a>
+      <a href="#capabilities">Capabilities</a>
       <a href="#privacy">Privacy</a>
       <a href="#start">Quick start</a>
       <a href="https://github.com/" rel="noopener">GitHub</a>
@@ -164,6 +166,58 @@ footer nav{display:flex;gap:20px}
       <li><span class="t">—</span><span class="src">_</span><span class="evt"><span class="caret" aria-hidden="true"></span></span></li>
     </ul>
     <div class="note">sample data · your real feed, your machine</div>
+  </div>
+</section>
+
+<section id="features" class="wrap" data-od-id="features">
+  <div class="sec-head">
+    <div>
+      <p class="eyebrow">Shipped in v0.1.0</p>
+      <h2>What you can run today</h2>
+    </div>
+    <p>Map view, alert delivery, mobile companions and an honest capability report — all in the open-source release.</p>
+  </div>
+  <div class="pillars">
+    <div class="pillar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z"/><path d="M9 4v14M15 6v14"/></svg>
+      <h3>Timeline map view</h3>
+      <p>Location-carrying events from Takeout, device and iOS companions render on a lazy-loaded map; click a point for the event detail.</p>
+    </div>
+    <div class="pillar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+      <h3>Alert delivery</h3>
+      <p>Detection rules notify by email (SMTP) and webhook, rate-limited to once per 24 h, with an acknowledged/dismissed state you can review later.</p>
+    </div>
+    <div class="pillar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+      <h3>Mobile companions</h3>
+      <p>Buildable Android app (real battery, network, OS, optional location) and iOS project sources with background refresh; a USB inspector needs no app install.</p>
+    </div>
+    <div class="pillar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M9 12l2 2 4-5"/><circle cx="12" cy="12" r="9"/></svg>
+      <h3>Honest capabilities</h3>
+      <p>Every source publishes a capability report. Unimplemented paths (Screen Time, motion activity, usage stats) report <code>available: false</code> with a reason.</p>
+    </div>
+  </div>
+</section>
+
+<section id="capabilities" class="wrap" data-od-id="capabilities">
+  <div class="sec-head">
+    <div>
+      <p class="eyebrow">Capability report</p>
+      <h2>What we can — and cannot — get</h2>
+    </div>
+    <p>The capability-gap view is the differentiator: no fabricated events, ever.</p>
+  </div>
+  <div class="src-grid">
+    <div class="src-row">
+      <div class="src-name"><b>Available</b></div>
+      <div class="src-data">Device registration, battery, network type, OS/build, location (permission-gated), background refresh, Google identity/scopes, Gmail security-alert metadata, calendar events, Drive file names, GitHub events, ActivityWatch window/browser/AFK, Wazuh agent status + alerts, Takeout history import.</div>
+    </div>
+    <div class="src-row">
+      <div class="src-name"><b>Not yet</b></div>
+      <div class="src-data">iOS Screen Time (Family Controls entitlement not enabled), iOS motion activity (CoreMotion not wired), Android app-usage stats (UsageStats collection not shipped), Google app-grant inventory (no consumer API — manual link provided), HealthKit data (per-type authorization).</div>
+    </div>
   </div>
 </section>
 
