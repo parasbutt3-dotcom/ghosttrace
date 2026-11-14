@@ -1,83 +1,31 @@
+# Use the latest 2.1 version of CircleCI pipeline process engine.
+# See: https://circleci.com/docs/reference/configuration-reference/
 version: 2.1
 
-orbs:
-  python: circleci/python@2.1.1
-  node: circleci/node@5.2.0
-
+# Define a job to be invoked later in a workflow.
+# See: https://circleci.com/docs/guides/orchestrate/jobs-steps/#jobs-overview & https://circleci.com/docs/reference/configuration-reference/#jobs
 jobs:
-  backend:
+  say-hello:
+    # Specify the execution environment. You can specify an image from Docker Hub or use one of our convenience images from CircleCI's Developer Hub.
+    # See: https://circleci.com/docs/guides/execution-managed/executor-intro/ & https://circleci.com/docs/reference/configuration-reference/#executor-job
     docker:
-      - image: cimg/python:3.12
-      - image: postgres:16
-        environment:
-          POSTGRES_USER: ghosttrace
-          POSTGRES_PASSWORD: ghosttrace
-          POSTGRES_DB: ghosttrace
-    environment:
-      DATABASE_URL: postgresql+psycopg2://ghosttrace:ghosttrace@localhost:5432/ghosttrace
-      SECRET_KEY: test-secret-key-32chars-minimum-aaaa
-      TOKEN_ENCRYPTION_KEY: QFJ-zhAIHeDkTDc8kPgFgjHhMbDO6u6_gc5XSfw69oI=
-      AUTO_SYNC_ENABLED: "false"
-      APP_ENV: development
-    steps:
-      - checkout
-      - python/install-packages:
-          pkg-manager: pip
-          app-dir: backend
-      - run:
-          name: Run tests
-          working_directory: backend
-          command: python -m pytest -q
-      - run:
-          name: Ruff
-          working_directory: backend
-          command: python -m ruff check app
-      - run:
-          name: Mypy
-          working_directory: backend
-          command: python -m mypy app --ignore-missing-imports
-      - run:
-          name: Import check
-          working_directory: backend
-          command: python -c "import app.main; print('import ok')"
+      # Specify the version you desire here
+      # See: https://circleci.com/developer/images/image/cimg/base
+      - image: cimg/base:current
 
-  frontend:
-    docker:
-      - image: cimg/node:20.18
+    # Add steps to the job
+    # See: https://circleci.com/docs/guides/orchestrate/jobs-steps/#steps-overview & https://circleci.com/docs/reference/configuration-reference/#steps
     steps:
-      - checkout
-      - node/install-packages:
-          app-dir: frontend
-          override-ci-command: npm ci
-      - run:
-          name: Lint
-          working_directory: frontend
-          command: npm run lint
-      - run:
-          name: Unit tests
-          working_directory: frontend
-          command: npm test -- --run
-      - run:
-          name: Build
-          working_directory: frontend
-          command: npm run build
-
-  android:
-    docker:
-      - image: cimg/openjdk:17.0
-    steps:
+      # Checkout the code as the first step.
       - checkout
       - run:
-          name: Make gradlew executable
-          command: chmod +x android/gradlew
-      - run:
-          name: Assemble debug APK
-          working_directory: android
-          command: ./gradlew assembleDebug
+          name: "Say hello"
+          command: "echo Hello, World!"
 
+# Orchestrate jobs using workflows
+# See: https://circleci.com/docs/guides/orchestrate/workflows/ & https://circleci.com/docs/reference/configuration-reference/#workflows
 workflows:
-  build-and-test:
+  say-hello-workflow: # This is the name of the workflow, feel free to change it to better match your workflow.
+    # Inside the workflow, you define the jobs you want to run.
     jobs:
-      - backend
-      - frontend
-      - android
+      - say-hello
