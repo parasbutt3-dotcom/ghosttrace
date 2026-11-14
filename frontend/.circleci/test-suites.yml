@@ -1,0 +1,6 @@
+---
+name: frontend tests
+discover: npx vitest list --filesOnly
+run: node run-tests.js "<< outputs.junit >>"
+options:
+  store-test-results: true

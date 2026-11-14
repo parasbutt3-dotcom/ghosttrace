@@ -1,0 +1,6 @@
+---
+name: backend tests
+discover: find . -type f -name 'test*.py' \( -path './tests/*' -o -path './testing/*' \)
+run: python -m pytest --disable-pytest-warnings --no-header --quiet --tb=short --override-ini=junit_family=legacy --junit-xml="<< outputs.junit >>" << test.atoms >>
+options:
+  store-test-results: true

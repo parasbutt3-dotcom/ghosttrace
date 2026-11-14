@@ -13,6 +13,7 @@ jobs:
           POSTGRES_USER: ghosttrace
           POSTGRES_PASSWORD: ghosttrace
           POSTGRES_DB: ghosttrace
+    parallelism: 2
     environment:
       DATABASE_URL: postgresql+psycopg2://ghosttrace:ghosttrace@localhost:5432/ghosttrace
       SECRET_KEY: test-secret-key-32chars-minimum-aaaa
@@ -25,9 +26,9 @@ jobs:
           pkg-manager: pip
           app-dir: backend
       - run:
-          name: Run tests
+          name: Run tests (Smarter Testing)
           working_directory: backend
-          command: python -m pytest -q
+          command: circleci testsuite run "backend tests"
       - run:
           name: Ruff
           working_directory: backend
@@ -44,6 +45,7 @@ jobs:
   frontend:
     docker:
       - image: cimg/node:20.18
+    parallelism: 2
     steps:
       - checkout
       - node/install-packages:
@@ -54,9 +56,9 @@ jobs:
           working_directory: frontend
           command: npm run lint
       - run:
-          name: Unit tests
+          name: Unit tests (Smarter Testing)
           working_directory: frontend
-          command: npm test -- --run
+          command: circleci testsuite run "frontend tests"
       - run:
           name: Build
           working_directory: frontend
