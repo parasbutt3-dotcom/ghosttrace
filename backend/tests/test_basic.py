@@ -545,3 +545,10 @@ def test_parse_alert_details_device_location_ip():
     assert d["ip"] == "103.2.1.4"
     assert parse_alert_details("signed in from a Chromebook in Austin, Texas") == {"device": "Chromebook", "location": "Austin, Texas"}
     assert parse_alert_details("Your password was changed") == {}
+
+def test_classify_app_grant_and_recovery():
+    from app.integrations.google import classify_google_alert, parse_alert_details
+    assert classify_google_alert("Security alert You allowed GHOSTTRACE access to some of your Google Account data")[0] == "security.app_granted"
+    assert classify_google_alert("Security alert Recovery email was changed for x@gmail.com")[0] == "security.recovery_change"
+    d = parse_alert_details("Security alert You allowed GHOSTTRACE access to some of your Google Account data")
+    assert d["app"] == "GHOSTTRACE"

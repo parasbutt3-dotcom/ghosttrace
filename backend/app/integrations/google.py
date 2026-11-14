@@ -17,6 +17,8 @@ GMAIL_ALERT_SENDER = "no-reply@accounts.google.com"
 _ALERT_PATTERNS = [
     (("new sign-in", "sign-in to your google account", "unusual sign-in", "unusual activity", "a new device signed in"),
      "security.login_alert", "New sign-in / activity alert"),
+    (("you allowed", "access to some of your google account data", "granted access", "third-party app"),
+     "security.app_granted", "App access granted to your account"),
     (("password", "passkey"), "security.password_change", "Credential change"),
     (("recovery email", "recovery phone", "recovery option"), "security.recovery_change", "Recovery option change"),
     (("2-step", "two-step", "verification prompt", "authenticator"), "security.mfa_change", "2-Step Verification change"),
@@ -57,6 +59,9 @@ def parse_alert_details(text: str) -> dict:
     m = re.search(r"\bIP(?: address)?[:\s]+((?:\d{1,3}\.){3}\d{1,3})", text or "", re.I)
     if m:
         out["ip"] = m.group(1)
+    m = re.search(r"You allowed ([\w .-]+?) access to", text or "")
+    if m:
+        out["app"] = m.group(1).strip()
     return out
 
 
@@ -324,14 +329,15 @@ class GoogleIntegration(BaseIntegration):
             mdata = mr.json()
             headers = {h.get("name", "").lower(): h.get("value", "") for h in mdata.get("payload", {}).get("headers", [])}
             subject = headers.get("subject", "")
-            parsed = classify_google_alert(subject)
+            combined = f"{subject} {mdata.get('snippet', '')}"
+            parsed = classify_google_alert(combined)
             if not parsed:
                 continue
             event_type, label = parsed
-            details = parse_alert_details(f"{subject} {mdata.get('snippet', '')}")
+            details = parse_alert_details(combined)
             desc = f"{label}: {subject}"
             if details:
-                desc += " [" + " · ".join(details.get(k, "") for k in ("device", "location", "ip") if details.get(k)) + "]"
+                desc += " [" + " · ".join(details.get(k, "") for k in ("app", "device", "location", "ip") if details.get(k)) + "]"
             self._ingest_event(
                 source="google", application="Google Security Alerts", event_type=event_type,
                 category="security",
