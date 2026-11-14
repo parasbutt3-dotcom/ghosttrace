@@ -10,6 +10,7 @@ final class LocationCollector: NSObject, CLLocationManagerDelegate {
     private let telemetry: TelemetryService
     private var lastReport: Date? = nil
     private let minInterval: TimeInterval = 300 // 5 min between pushes
+    private var isAuthorized = false
 
     init(telemetry: TelemetryService) {
         self.telemetry = telemetry
@@ -17,14 +18,32 @@ final class LocationCollector: NSObject, CLLocationManagerDelegate {
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         manager.activityType = .otherNavigation
+        manager.allowsBackgroundLocationUpdates = true
+        manager.pausesLocationUpdatesAutomatically = true
     }
 
     func start() {
-        manager.requestWhenInUseAuthorization()
-        manager.startMonitoringSignificantLocationChanges()
+        let status = manager.authorizationStatus
+        switch status {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse, .authorizedAlways:
+            isAuthorized = true
+            manager.startMonitoringSignificantLocationChanges()
+        case .denied, .restricted:
+            print("Location access denied or restricted — skipping location collection")
+        @unknown default:
+            break
+        }
+    }
+
+    func stop() {
+        manager.stopUpdatingLocation()
+        manager.stopMonitoringSignificantLocationChanges()
     }
 
     private func emit(_ location: CLLocation, label: String) {
+        guard isAuthorized else { return }
         let now = Date()
         if let last = lastReport, now.timeIntervalSince(last) < minInterval { return }
         lastReport = now
@@ -51,8 +70,22 @@ final class LocationCollector: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        if manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse {
+        switch manager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            isAuthorized = true
             manager.startUpdatingLocation()
+            manager.startMonitoringSignificantLocationChanges()
+        case .denied, .restricted:
+            isAuthorized = false
+            print("Location access denied — location collection disabled")
+        case .notDetermined:
+            break
+        @unknown default:
+            break
         }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("Location error: \(error.localizedDescription)")
     }
 }

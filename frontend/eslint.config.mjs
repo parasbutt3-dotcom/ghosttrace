@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // CircleCI Smarter Testing wrapper (CommonJS, not TS):
+    "run-tests.js",
   ]),
 ]);
 

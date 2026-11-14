@@ -14,7 +14,7 @@ class IOSIntegration(BaseIntegration):
             Capability("device_registration", True, "Devices register with a device key"),
             Capability("screen_time", False, "Family Controls entitlement not enabled; no implemented collection path"),
             Capability("location", True, "Only if user grants location permission"),
-            Capability("motion_activity", False, "No implemented collection path (CoreMotion not wired)"),
+            Capability("motion_activity", True, "CoreMotion activity transitions (walking/running/cycling/driving/stationary)"),
             Capability("health_data", False, "HealthKit data requires explicit per-type authorization and is not auto-collected", requires=["HealthKit entitlements"]),
             Capability("background_refresh", True, "BGTaskScheduler with user permission"),
         ]

@@ -29,7 +29,7 @@
     <dict/>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
-        <string>armv7</string>
+        <string>arm64</string>
     </array>
     <key>UISupportedInterfaceOrientations</key>
     <array>
@@ -45,6 +45,8 @@
     <string>Import your meetings into your activity timeline.</string>
     <key>NSCalendarsUsageDescription</key>
     <string>Import your meetings into your activity timeline.</string>
+    <key>NSMotionUsageDescription</key>
+    <string>Track your physical activity (walking, running, cycling) for your activity timeline.</string>
     <key>UIBackgroundModes</key>
     <array>
         <string>fetch</string>

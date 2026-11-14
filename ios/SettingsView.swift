@@ -6,6 +6,8 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("ghosttrace.baseURL") private var baseURL: String = "http://127.0.0.1:8000"
     @AppStorage("ghosttrace.deviceKey") private var deviceKey: String = ""
+    @AppStorage("ghosttrace.motionEnabled") private var motionEnabled: Bool = true
+    @AppStorage("ghosttrace.locationEnabled") private var locationEnabled: Bool = true
 
     var body: some View {
         NavigationStack {
@@ -19,8 +21,12 @@ struct SettingsView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
+                Section("Collection") {
+                    Toggle("Location tracking", isOn: $locationEnabled)
+                    Toggle("Motion activity", isOn: $motionEnabled)
+                }
                 Section {
-                    Text("Register the device first: dashboard -> Devices -> Register iOS Device, then paste the one-time key here. Screen Time / app-usage data is not collected (Family Controls entitlement not enabled).")
+                    Text("Register the device first: dashboard -> Devices -> Register iOS Device, then paste the one-time key here. Screen Time / app-usage data is not collected (Family Controls entitlement not enabled). Motion activity uses CoreMotion and is collected locally.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

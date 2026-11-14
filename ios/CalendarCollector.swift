@@ -7,6 +7,7 @@ import EventKit
 final class CalendarCollector {
     private let store = EKEventStore()
     private let telemetry: TelemetryService
+    private var isAuthorized = false
 
     init(telemetry: TelemetryService) {
         self.telemetry = telemetry
@@ -14,12 +15,20 @@ final class CalendarCollector {
 
     @available(iOS 17.0, macOS 14.0, *)
     func start(completion: ((Bool) -> Void)? = nil) {
-        store.requestFullAccessToEvents { granted, _ in
-            DispatchQueue.main.async { completion?(granted) }
+        store.requestFullAccessToEvents { [weak self] granted, error in
+            DispatchQueue.main.async {
+                self?.isAuthorized = granted
+                if let error { print("Calendar access error: \(error.localizedDescription)") }
+                completion?(granted)
+            }
         }
     }
 
     func syncNow() {
+        guard isAuthorized else {
+            print("Calendar access not granted — skipping sync")
+            return
+        }
         let now = Date()
         guard let to = Calendar.current.date(byAdding: .hour, value: 24, to: now) else { return }
         let predicate = store.predicateForEvents(withStart: now, end: to, calendars: nil)

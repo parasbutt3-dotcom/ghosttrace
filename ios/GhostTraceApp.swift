@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     let telemetry = TelemetryService()
     lazy var locationCollector = LocationCollector(telemetry: telemetry)
     lazy var calendarCollector = CalendarCollector(telemetry: telemetry)
+    lazy var motionCollector = MotionActivityCollector(telemetry: telemetry)
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
@@ -37,6 +38,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         if #available(iOS 17.0, *) {
             calendarCollector.start { _ in self.calendarCollector.syncNow() }
         }
+        motionCollector.start()
         let timer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
             guard let self else { return }
             if #available(iOS 17.0, *) { self.calendarCollector.syncNow() }
@@ -49,6 +51,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func applicationDidEnterBackground(_ application: UIApplication) {
         BackgroundScheduler.schedule(telemetry: telemetry)
+    }
+
+    func applicationWillTerminate(_ application: UIApplication) {
+        locationCollector.stop()
+        motionCollector.stop()
     }
 }
 
@@ -64,9 +71,13 @@ enum BackgroundScheduler {
 
     private static func handle(_ task: BGAppRefreshTask, telemetry: TelemetryService) {
         task.expirationHandler = { task.setTaskCompleted(success: false) }
+        // Push a heartbeat; the offline queue flushes automatically on next push.
         telemetry.push(events: [])
         schedule(telemetry: telemetry)
-        task.setTaskCompleted(success: true)
+        // Give the network request a brief window to start before completing.
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+            task.setTaskCompleted(success: true)
+        }
     }
 
     static func schedule(telemetry: TelemetryService) {

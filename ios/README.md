@@ -5,11 +5,12 @@ Swift companion that registers a device and pushes telemetry to the GHOSTTRACE b
 ## Files
 - `project.yml` — XcodeGen spec. Generate the Xcode project with `xcodegen generate`.
 - `Info.plist` — bundle + permission + background-mode configuration.
-- `TelemetryService.swift` — HTTP push + battery (UIDevice) + network (NWPathMonitor) + OS/app version collection.
-- `LocationCollector.swift` — significant location changes → `location.point` events.
-- `CalendarCollector.swift` — phone calendars (all accounts) → `calendar.event` events.
-- `SettingsView.swift` — SwiftUI settings for base URL + device key.
-- `GhostTraceApp.swift` — app entry point, background refresh scheduling, collector wiring.
+- `TelemetryService.swift` — HTTP push + battery (UIDevice) + network (NWPathMonitor) + OS/app version collection. Includes offline event queue (persisted to UserDefaults, up to 500 events) and retry with exponential backoff (3 attempts).
+- `LocationCollector.swift` — significant location changes → `location.point` events. Handles authorization states (notDetermined/authorized/denied) properly.
+- `CalendarCollector.swift` — phone calendars (all accounts) → `calendar.event` events. Checks authorization before syncing.
+- `MotionActivityCollector.swift` — CoreMotion activity transitions (walking/running/cycling/driving/stationary) → `motion.activity` events.
+- `SettingsView.swift` — SwiftUI settings for base URL + device key + collection toggles.
+- `GhostTraceApp.swift` — app entry point, background refresh scheduling, collector wiring, motion activity.
 
 ## Build (XcodeGen)
 ```sh
@@ -27,7 +28,9 @@ let telemetry = TelemetryService()   // reads base URL + device key from Setting
 telemetry.observeBattery()
 let location = LocationCollector(telemetry: telemetry)
 let calendar = CalendarCollector(telemetry: telemetry)
+let motion = MotionActivityCollector(telemetry: telemetry)
 location.start()
+motion.start()
 // calendar permission + sync on iOS 17+
 ```
 Register the device first: dashboard → Devices → Register iOS Device, copy the one-time key, then paste it in Settings.
@@ -57,7 +60,8 @@ Background refresh is scheduled via `BGTaskScheduler` (identifier `com.ghosttrac
 ## Notes
 - No stealth tracking; app must be visibly installed and authorized.
 - Screen Time / app-usage data requires Apple's Family Controls entitlement — **not enabled here**; capability stays `false` (see backend `ios` integration).
-- Motion activity (CoreMotion) is not collected; capability stays `false`.
+- Motion activity (CoreMotion) is now collected → `motion.activity` events; capability set to `true`.
 - HealthKit data is never auto-collected; each type requires explicit permission.
+- Offline queue: failed pushes are persisted to UserDefaults and retried on the next push (up to 500 events, oldest dropped first).
 - USB fallback (no app install): `tools/ios_inspector.py` (pymobiledevice3). Use `--dry-run` to print the payload without connecting.
 - These files are ready-to-build sources; compile in Xcode (not built in this repo's CI beyond `swiftc -typecheck`).
