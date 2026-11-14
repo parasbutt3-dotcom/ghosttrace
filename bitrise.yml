@@ -1,0 +1,58 @@
+format_version: "13"
+default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
+
+title: GhostTrace CI
+
+# Trigger on every push to main
+trigger_map:
+  - push_branch: "*"
+    workflow: primary
+  - pull_request_source_branch: "*"
+    workflow: primary
+
+workflows:
+  primary:
+    steps:
+      - activate-ssh-key@4: {}
+      - git-clone@8: {}
+      # --- Backend ---
+      - script@1:
+          title: "Backend: install + test"
+          inputs:
+            - content: |
+                cd backend
+                python -m pip install -r requirements.txt
+                python -m pytest -q
+                python -m ruff check app
+                python -c "import app.main; print('import ok')"
+      # --- Frontend ---
+      - script@1:
+          title: "Frontend: install + lint + test + build"
+          inputs:
+            - content: |
+                cd frontend
+                npm ci
+                npm run lint
+                npm test -- --run
+                npm run build
+      # --- Android ---
+      - script@1:
+          title: "Android: assemble debug"
+          inputs:
+            - content: |
+                cd android
+                chmod +x gradlew
+                ./gradlew assembleDebug
+      # --- iOS (typecheck only — no Xcode build on free tier) ---
+      - script@1:
+          title: "iOS: swiftc typecheck"
+          inputs:
+            - content: |
+                cd ios
+                xcrun swiftc -typecheck \
+                  TelemetryService.swift \
+                  LocationCollector.swift \
+                  CalendarCollector.swift \
+                  MotionActivityCollector.swift \
+                  GhostTraceApp.swift \
+                  SettingsView.swift
