@@ -200,7 +200,12 @@ def test_google_sync_ingests_gmail_alerts():
         }
         mid = url.rsplit("/", 1)[-1]
         subj, date = hdr_map[mid]
-        return resp(url, {"id": mid, "payload": {"headers": [{"name": "Subject", "value": subj}, {"name": "Date", "value": date}]}})
+        snippet = {
+            "m1": "Your Google Account was just signed in to from an iPhone near Karachi, Pakistan. IP address: 103.2.1.4",
+            "m3": "Your Google Account was just signed in to from a Windows device near Berlin, Germany.",
+        }.get(mid, "")
+        return resp(url, {"id": mid, "snippet": snippet,
+                          "payload": {"headers": [{"name": "Subject", "value": subj}, {"name": "Date", "value": date}]}})
 
     class _FakeAsyncClient:
         def __init__(self, *a, **kw):
@@ -528,3 +533,15 @@ def test_health_security_headers():
     assert "frame-ancestors 'none'" in csp
     # HSTS is only sent in production; test env is development.
     assert "strict-transport-security" not in r.headers
+
+def test_parse_alert_details_device_location_ip():
+    from app.integrations.google import parse_alert_details
+    d = parse_alert_details(
+        "New sign-in to your Google Account Your Google Account was just signed in to "
+        "from an iPhone near Karachi, Pakistan. IP address: 103.2.1.4"
+    )
+    assert d["device"] == "iPhone"
+    assert d["location"] == "Karachi, Pakistan"
+    assert d["ip"] == "103.2.1.4"
+    assert parse_alert_details("signed in from a Chromebook in Austin, Texas") == {"device": "Chromebook", "location": "Austin, Texas"}
+    assert parse_alert_details("Your password was changed") == {}

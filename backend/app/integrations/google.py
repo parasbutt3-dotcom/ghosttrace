@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -31,6 +32,32 @@ def classify_google_alert(subject: str) -> tuple[str, str] | None:
         if any(n in s for n in needles):
             return event_type, label
     return None
+
+
+_DEVICE_WORDS = {
+    "iphone": "iPhone", "ipad": "iPad", "android": "Android", "windows": "Windows",
+    "chrome os": "ChromeOS", "chromebook": "Chromebook", "mac": "Mac",
+    "linux": "Linux", "playstation": "PlayStation", "xbox": "Xbox",
+}
+
+
+def parse_alert_details(text: str) -> dict:
+    """Extract device / location / IP hints from alert subject+snippet so phone
+    sign-ins are attributable without any on-device agent."""
+    out: dict[str, str] = {}
+    lower = (text or "").lower()
+    # Longest keys first so "chrome os" wins over "mac" inside "chrome mac..." noise
+    for word, label in sorted(_DEVICE_WORDS.items(), key=lambda kv: -len(kv[0])):
+        if word in lower:
+            out["device"] = label
+            break
+    m = re.search(r"(?:near|in|from) ([A-Z][A-Za-z '-]*, [A-Z][A-Za-z '-]*)", text or "")
+    if m:
+        out["location"] = m.group(1).strip()
+    m = re.search(r"\bIP(?: address)?[:\s]+((?:\d{1,3}\.){3}\d{1,3})", text or "", re.I)
+    if m:
+        out["ip"] = m.group(1)
+    return out
 
 
 def _rfc2822_to_datetime(value: str):
@@ -294,17 +321,23 @@ class GoogleIntegration(BaseIntegration):
             mr = await client.get(f"{base}/messages/{mid}", headers=auth, params={"format": "metadata", "metadataHeaders": ["Subject", "Date"]})
             if mr.status_code != 200:
                 continue
-            headers = {h.get("name", "").lower(): h.get("value", "") for h in mr.json().get("payload", {}).get("headers", [])}
-            parsed = classify_google_alert(headers.get("subject", ""))
+            mdata = mr.json()
+            headers = {h.get("name", "").lower(): h.get("value", "") for h in mdata.get("payload", {}).get("headers", [])}
+            subject = headers.get("subject", "")
+            parsed = classify_google_alert(subject)
             if not parsed:
                 continue
             event_type, label = parsed
+            details = parse_alert_details(f"{subject} {mdata.get('snippet', '')}")
+            desc = f"{label}: {subject}"
+            if details:
+                desc += " [" + " · ".join(details.get(k, "") for k in ("device", "location", "ip") if details.get(k)) + "]"
             self._ingest_event(
                 source="google", application="Google Security Alerts", event_type=event_type,
                 category="security",
-                description=f"{label}: {headers.get('subject', '')}",
+                description=desc,
                 timestamp=_rfc2822_to_datetime(headers.get("date", "")),
-                metadata={"gmail_message_id": mid, "subject": headers.get("subject", ""), "date": headers.get("date", "")},
+                metadata={"gmail_message_id": mid, "subject": subject, "date": headers.get("date", ""), **details},
                 collection_method="gmail_alerts", permission_status="authorized", confidence=0.9,
                 dedup_key=f"google:alert:{mid}",
             )
