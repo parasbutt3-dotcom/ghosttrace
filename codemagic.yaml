@@ -1,0 +1,124 @@
+workflows:
+  ios-typecheck:
+    name: iOS Companion Typecheck
+    max_build_duration: 15
+    environment:
+      groups:
+        - default
+      xcode: latest
+      vars:
+        FLUTTER_VERSION: ""
+    scripts:
+      - name: Typecheck iOS Swift sources
+        script: |
+          cd ios
+          xcrun swiftc -typecheck \
+            TelemetryService.swift \
+            LocationCollector.swift \
+            CalendarCollector.swift \
+            MotionActivityCollector.swift \
+            GhostTraceApp.swift \
+            SettingsView.swift
+          echo "iOS typecheck passed"
+    artifacts:
+      - ios/**/*.swift
+
+  android-build:
+    name: Android Companion Build
+    max_build_duration: 30
+    environment:
+      groups:
+        - default
+      java: 17
+    scripts:
+      - name: Make gradlew executable
+        script: chmod +x android/gradlew
+      - name: Assemble debug APK
+        script: |
+          cd android
+          ./gradlew assembleDebug
+    artifacts:
+      - android/app/build/outputs/**/*.apk
+
+  backend-tests:
+    name: Backend Tests
+    max_build_duration: 20
+    environment:
+      groups:
+        - default
+      python: 3.12
+    services:
+      - postgres
+    scripts:
+      - name: Install dependencies
+        script: |
+          cd backend
+          python -m pip install -r requirements.txt
+      - name: Run tests
+        script: |
+          cd backend
+          python -m pytest -q
+      - name: Ruff
+        script: |
+          cd backend
+          python -m ruff check app
+      - name: Mypy
+        script: |
+          cd backend
+          python -m mypy app --ignore-missing-imports
+      - name: Import check
+        script: |
+          cd backend
+          python -c "import app.main; print('import ok')"
+
+  frontend-build:
+    name: Frontend Build
+    max_build_duration: 20
+    environment:
+      groups:
+        - default
+      node: 20
+    scripts:
+      - name: Install dependencies
+        script: |
+          cd frontend
+          npm ci
+      - name: Lint
+        script: |
+          cd frontend
+          npm run lint
+      - name: Unit tests
+        script: |
+          cd frontend
+          npm test -- --run
+      - name: Build
+        script: |
+          cd frontend
+          npm run build
+
+  full-pipeline:
+    name: Full Pipeline
+    max_build_duration: 45
+    environment:
+      groups:
+        - default
+    scripts:
+      - name: Backend tests
+        script: |
+          cd backend
+          python -m pip install -r requirements.txt
+          python -m pytest -q
+          python -m ruff check app
+          python -c "import app.main; print('import ok')"
+      - name: Frontend build
+        script: |
+          cd frontend
+          npm ci
+          npm run lint
+          npm test -- --run
+          npm run build
+      - name: Android assemble
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
