@@ -85,7 +85,7 @@ jobs:
     # UIKit-only paths are behind #if canImport(UIKit); CoreLocation,
     # EventKit and Network exist on macOS, so the same files type-check
     # against the macOS SDK — catching syntax/API errors without a Mac.
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Type-check iOS companion
